@@ -67,8 +67,6 @@ org_ref_list <-  data.frame(org_iati_ref = unique(dfid_partners$org_iati_ref)) %
 
 
 
-
-
 # 3) Extract all these organisations' ODA activities ----
 
 # Set strings for API URL
@@ -108,4 +106,14 @@ while (page == 1 | new_rows > 0) {
   y <- nrow(partner_activity_list_final)
   new_rows = y - x
 }
+
+# Save to Rdata file
+saveRDS(partner_activity_list_final, file = "partner_activity_list_final.rds")
+# partner_activity_list_final <- readRDS(file = "partner_activity_list_final.rds")
+
+
+# How many partners have published activities?
+test <- unique(partner_activity_list_final$reporting_org.ref)
+
+
 
