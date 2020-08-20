@@ -63,8 +63,16 @@ research_extract <- function(page) {
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
+  new_data <- response$results
   
-  research_list <- rbind(research_list_final, response$results)
+  # Ensure "default flow type" field exists for joining datasets
+  if("default_flow_type.name" %in% names(new_data)) {
+     new_data <- new_data %>% 
+                    mutate(default_flow_type = default_flow_type.name) %>% 
+                    select(-default_flow_type.name, -default_flow_type.code)
+  } 
+  
+  research_list <- rbind(research_list_final, new_data)
   
   return(research_list)
 }
@@ -92,8 +100,16 @@ fund_extract <- function(fund_string, page) {
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
+  new_data <- response$results
   
-  fund_list <- rbind(fund_list_final, response$results)
+  # Ensure "default flow type" field exists for joining datasets
+  if("default_flow_type.name" %in% names(new_data)) {
+    new_data <- new_data %>% 
+      mutate(default_flow_type = default_flow_type.name) %>% 
+      select(-default_flow_type.name, -default_flow_type.code)
+  } 
+  
+  fund_list <- rbind(fund_list_final, new_data)
   
   return(fund_list)
 }
@@ -117,7 +133,7 @@ for (fund in c("NEWT", "Newton", "GCRF", "NIHR")) {
 
 # Combine and dedup
 activity_list_final <- rbind(research_list_final, fund_list_final) %>% 
-  unique()
+                            unique()
 
 # Save to Rdata file
 saveRDS(activity_list_final, file = "activity_list_final.rds")
@@ -132,7 +148,8 @@ saveRDS(activity_list_final, file = "activity_list_final.rds")
 activity_list_base <- activity_list_final %>% 
   select(iati_identifier, hierarchy, 
          activity_status = activity_status.name,
-         flow_type = default_flow_type.name)
+         flow_type = default_flow_type) %>% 
+  mutate(activity_id = "")
 
 # 1) Unlist activity title and description
 activity_list_unnest_1 <- activity_list_final %>% 
@@ -255,7 +272,7 @@ activity_list <- activity_list_base %>%
 # Reorder columns and add date of refresh
 activity_list <- activity_list %>% 
   select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
-         hierarchy, activity_status, flow_type,
+         hierarchy, activity_status, flow_type, activity_id,
          activity_title, activity_description, country_code, start_date, end_date,
          country_name, country_percentage, sector_code, sector_name,
          policy_marker_code, policy_marker_name, policy_significance, climate_focus,
@@ -270,4 +287,5 @@ saveRDS(activity_list, file = "activity_list.rds")
 # Save to Excel
 write_xlsx(x = list(`IATI research` = activity_list), 
            path = "IATI research activities.xlsx")
+          # path = "https:\\dfid.sharepoint.com\sites\ts-198\IATI research activities.xlsx")
 
