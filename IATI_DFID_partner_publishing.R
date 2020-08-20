@@ -141,7 +141,7 @@ test <- rbind(test2, test3)
 
 # Save to Rdata file
 saveRDS(partner_activity_list_final, file = "partner_activity_list_raw.rds")
-# partner_activity_list_final <- readRDS(file = "partner_activity_list_final.rds")
+# partner_activity_list_final <- readRDS(file = "partner_activity_list_raw.rds")
 
 # How many partners have published activities?
 no_partners <- unique(partner_activity_list_final$reporting_org.ref)
@@ -187,6 +187,7 @@ activity_list_unnest_3 <- partner_activity_list_final %>%
   unnest(cols = sector,
          keep_empty = TRUE) %>% 
   select(iati_identifier, sector.code, sector.name, percentage) %>% 
+  filter(sector.code %in% sector_list_research$code) %>% 
   group_by(iati_identifier) %>%
   summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
             sector_name = paste(coalesce(sector.name, ""), collapse = ", "),
@@ -269,7 +270,7 @@ activity_list_unnest_8 <- partner_activity_list_final %>%
 activity_list <- activity_list_base %>% 
   left_join(activity_list_unnest_1, by = "iati_identifier") %>%
   left_join(activity_list_unnest_2, by = "iati_identifier") %>%
-  left_join(activity_list_unnest_3, by = "iati_identifier") %>%
+  inner_join(activity_list_unnest_3, by = "iati_identifier") %>%
   left_join(activity_list_unnest_4, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_5, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_6, by = "iati_identifier") %>% 
@@ -290,5 +291,11 @@ activity_list <- activity_list %>%
 
 # Save to Rdata file
 saveRDS(activity_list, file = "DFID_partner_activities_unnested.rds")
+
+
+# Filter climate change activities
+partner_climate_activities <- filter(activity_list, !is.na(climate_focus))
+                                 
+
 
 
