@@ -93,8 +93,6 @@ while (page == 1 | new_rows > 0) {
 
 # B. Extract activities based on fund
 
-fund_strings <- "Newton,NEWT,GCRF,NIHR"
-
 fund_extract <- function(fund_string, page) {
   path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?q=", fund_string, "&q_fields=iati_identifier&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20&page=", page)
   request <- GET(url = path)
@@ -118,7 +116,7 @@ fund_extract <- function(fund_string, page) {
 fund_list_final <- data.frame()
 
 # Run extraction, stopping when no new sector codes returned
-for (fund in c("NEWT", "Newton", "GCRF", "NIHR")) {
+for (fund in c("NEWT", "Newton", "GCRF", "NIHR", "GAMRIF", "UKVN")) {
   new_rows <- 0
   page <- 1
   
@@ -149,7 +147,9 @@ activity_list_base <- activity_list_final %>%
   select(iati_identifier, hierarchy, 
          activity_status = activity_status.name,
          flow_type = default_flow_type) %>% 
-  mutate(activity_id = "")
+  mutate(activity_id = "") %>% 
+  unique()
+
 
 # 1) Unlist activity title and description
 activity_list_unnest_1 <- activity_list_final %>% 
@@ -159,12 +159,25 @@ activity_list_unnest_1 <- activity_list_final %>%
   rename(activity_title = text) %>% 
   unnest(cols = description,
          keep_empty = TRUE) %>% 
-  filter(coalesce(type.name, "General") == "General") %>% 
-  select(iati_identifier, activity_title, narrative) %>% 
+  mutate(type.name = coalesce(type.name, "General")) %>% 
+  select(iati_identifier, activity_title, type.name, narrative) %>% 
   unnest(cols = narrative,
          keep_empty = TRUE) %>%     
-  group_by(iati_identifier, activity_title) %>%
-  summarise(activity_description = paste(coalesce(text, ""), collapse = "; "))
+  unique()
+
+
+# Fix records with multiple "General" descriptions
+
+activities_to_fix <- activity_list_unnest_1 %>% 
+                        group_by(iati_identifier, activity_title, type.name) %>% 
+                        summarise(no_descriptions = n()) %>% 
+                        filter(no_descriptions > 1)
+
+
+activity_list_unnest_1 <- activity_list_unnest_1 %>% 
+                              group_by(iati_identifier, activity_title, type.name) %>% 
+                              summarise(text = paste(coalesce(text, ""), collapse = "; ")) %>% 
+                              spread(key = type.name, value = text)
 
 
 # 2) Unlist recipient countries
@@ -173,6 +186,7 @@ activity_list_unnest_2 <- activity_list_final %>%
          keep_empty = TRUE) %>% 
   select(iati_identifier, percentage, country.code, country.name) %>% 
   group_by(iati_identifier) %>%
+  unique() %>% 
   summarise(country_code = paste(coalesce(country.code, ""), collapse = ", "),
             country_name = paste(coalesce(country.name, ""), collapse = ", "),
             country_percentage = paste(coalesce(percentage, 100), collapse = ", "))
@@ -184,6 +198,7 @@ activity_list_unnest_3 <- activity_list_final %>%
          keep_empty = TRUE) %>% 
   select(iati_identifier, sector.code, sector.name, percentage) %>% 
   group_by(iati_identifier) %>%
+  unique() %>% 
   summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
             sector_name = paste(coalesce(sector.name, ""), collapse = ", "),
             sector_percentage = paste(coalesce(percentage, 100), collapse = ", "))
@@ -209,7 +224,8 @@ activity_list_unnest_5 <- activity_list_final %>%
          keep_empty = TRUE) %>% 
   select(iati_identifier, reporting_org_ref = reporting_org.ref, 
          reporting_org_type = reporting_org.type.name,
-         reporting_org = text)
+         reporting_org = text) %>% 
+  unique()
 
 
 # 6) Unlist and aggregate committments
@@ -273,7 +289,7 @@ activity_list <- activity_list_base %>%
 activity_list <- activity_list %>% 
   select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
          hierarchy, activity_status, flow_type, activity_id,
-         activity_title, activity_description, country_code, start_date, end_date,
+         activity_title, General, Objectives, country_code, start_date, end_date,
          country_name, country_percentage, sector_code, sector_name,
          policy_marker_code, policy_marker_name, policy_significance, climate_focus,
          sector_percentage, partner, partner_role, 
@@ -281,11 +297,29 @@ activity_list <- activity_list %>%
   unique() %>% 
   mutate(refresh_date = Sys.Date()) 
 
+
+
+components_only <- activity_list %>% 
+                      mutate(programme_id = if_else(hierarchy == 2, 
+                                                    substr(iati_identifier, 1, nchar(iati_identifier)-4), iati_identifier)) %>% 
+                      filter(hierarchy == 2 | reporting_org_ref %in% c("GB-GOV-3", "GB-GOV-7") |
+                               str_detect(iati_identifier, "GAMRIF") | str_detect(iati_identifier, "UKVN")) %>% # Defra and FCO do not use child hierarchies
+                      select(-climate_focus) %>% 
+                      left_join(select(activity_list, 
+                                       iati_identifier, climate_focus, 
+                                       programme_title = activity_title,
+                                       programme_description = General), 
+                                by = c("programme_id" = "iati_identifier")) %>% 
+                      mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
+                                                            programme_description,
+                                                            General))
+
+
 # Save to Rdata file
-saveRDS(activity_list, file = "activity_list.rds")
+saveRDS(components_only, file = "activity_list.rds")
 
 # Save to Excel
-write_xlsx(x = list(`IATI research` = activity_list), 
-           path = "IATI research activities.xlsx")
-          # path = "https:\\dfid.sharepoint.com\sites\ts-198\IATI research activities.xlsx")
+write_xlsx(x = list(`IATI research` = components_only), 
+          # path = "C:\\Users\\CleggE\\OneDrive - Wellcome Cloud\\IATI Research\\IATI research activities.xlsx")
+           path = "https:\\dfid.sharepoint.com\sites\ts-198\IATI research activities.xlsx")
 
