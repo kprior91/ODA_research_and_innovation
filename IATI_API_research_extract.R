@@ -1,15 +1,24 @@
 # --------------------------------------------------------------- #
-# Test extracting activities in South Africa from UK institutions #
+# Extract ODA research activitie from public IATI data #
 # --------------------------------------------------------------- #
 
-# install.packages("jsonlite")
-# install.packages("httr")
+if (!("jsonlite" %in% installed.packages())) {
+  install.packages("jsonlite")
+}
+if (!("httr" %in% installed.packages())) {
+  install.packages("httr")
+}
+if (!("tidyverse" %in% installed.packages())) {
+  install.packages("tidyverse")
+}
+if (!("writexl" %in% installed.packages())) {
+  install.packages("writexl")
+}
 
 library(jsonlite)
 library(httr)
 library(tidyverse)
 library(writexl)
-
 
 # 1) Extract list of research sector codes from IATI -----------------------------
 
@@ -139,7 +148,6 @@ saveRDS(activity_list_final, file = "activity_list_final.rds")
 # activity_list_final <- readRDS(file = "activity_list_final.rds")
 
 
-
 # Extract accompanying data ----
 
 # Extract base activity information - hierarchy and status
@@ -198,7 +206,18 @@ activity_list_unnest_3 <- activity_list_final %>%
          keep_empty = TRUE) %>% 
   select(iati_identifier, sector.code, sector.name, percentage) %>% 
   group_by(iati_identifier) %>%
-  unique() %>% 
+  unique()
+
+# Extract research sector percentages
+sector_percentages <- activity_list_unnest_3 %>% 
+                         filter(sector.name %in% sector_list_research$name, 
+                                !is.na(percentage), percentage != 100) %>% 
+                      select(iati_identifier, percentage) %>% 
+                      group_by(iati_identifier) %>% 
+                      summarise(research_pc = sum(percentage))
+
+# Summarise all sector descriptions for each activity
+activity_list_unnest_3 <- activity_list_unnest_3 %>% 
   summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
             sector_name = paste(coalesce(sector.name, ""), collapse = ", "),
             sector_percentage = paste(coalesce(percentage, 100), collapse = ", "))
@@ -232,7 +251,7 @@ activity_list_unnest_5 <- activity_list_final %>%
 activity_list_unnest_6 <- activity_list_final %>% 
   unnest(cols = budget,
          keep_empty = TRUE) %>% 
-#  filter(value.date >= "2015-04-01" & value.date <= "2020-03-31") %>% 
+#  filter(value.date >= "2015-04-01" & value.date <= "2020-03-31") %>%   # restrict time window for spend
   select(iati_identifier, 
          budget_status = status.name, 
          amount = value.value, 
@@ -240,6 +259,12 @@ activity_list_unnest_6 <- activity_list_final %>%
   group_by(iati_identifier, budget_status, currency) %>% 
   summarise(amount = sum(amount), 0) %>% 
   filter(!is.na(budget_status))
+
+# Join on research percentages
+activity_list_unnest_6 <- activity_list_unnest_6 %>% 
+      left_join(sector_percentages, by = "iati_identifier") %>% 
+      mutate(research_pc = coalesce(research_pc, 100)) %>% 
+      mutate(adjusted_amount = (research_pc/100)*amount)
 
 
 # 7) Unlist and aggregate policy markers
@@ -293,11 +318,28 @@ activity_list <- activity_list %>%
          country_name, country_percentage, sector_code, sector_name,
          policy_marker_code, policy_marker_name, policy_significance, climate_focus,
          sector_percentage, partner, partner_role, 
-         budget_status, amount, currency) %>% 
+         budget_status, amount = adjusted_amount, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date()) 
 
 
+# Add Fund label
+activity_list <- activity_list %>%  
+    mutate(fund = case_when(
+      (str_detect(iati_identifier, "Newton") | str_detect(iati_identifier, "NEWT")) ~ "Newton",
+      str_detect(iati_identifier, "GCRF") ~ "GCRF",
+      str_detect(iati_identifier, "UKVN") ~ "UK Vaccine Network",
+      str_detect(iati_identifier, "GAMRIF") ~ "GAMRIF",
+      (str_detect(iati_identifier, "NIHR") | str_detect(activity_title, "NIHR")) ~ "Global Health Research",
+      str_detect(iati_identifier, "ICF") ~ "ICF",
+      str_detect(iati_identifier, "Chevening") ~ "Chevening",
+      TRUE ~ "Other"
+    ))
+
+
+
+# Extract detail at child activity level (if available) and ensure
+# spend is not being double-counted e.g. for DFID
 
 components_only <- activity_list %>% 
                       mutate(programme_id = if_else(hierarchy == 2, 
@@ -320,6 +362,6 @@ saveRDS(components_only, file = "activity_list.rds")
 
 # Save to Excel
 write_xlsx(x = list(`IATI research` = components_only), 
-          # path = "C:\\Users\\CleggE\\OneDrive - Wellcome Cloud\\IATI Research\\IATI research activities.xlsx")
-           path = "https:\\dfid.sharepoint.com\sites\ts-198\IATI research activities.xlsx")
+           path = "C:\\Users\\CleggE\\OneDrive - Wellcome Cloud\\IATI Research\\IATI research activities.xlsx")
+          # path = "https:\\dfid.sharepoint.com\sites\ts-198\IATI research activities.xlsx")
 
