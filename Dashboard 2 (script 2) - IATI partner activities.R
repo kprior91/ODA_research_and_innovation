@@ -1,5 +1,5 @@
 # --------------------------------------------------------------- #
-# Extract ODA research activitie from public IATI data #
+# Extract ODA research activities from public IATI data #
 # --------------------------------------------------------------- #
 
 if (!("jsonlite" %in% installed.packages())) {
@@ -26,11 +26,6 @@ iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
 
 
 # 2) Extract all partner activities from IATI Registry -----------
-
-activity_id = "DR10141"
-activity_id = "1182425"
-activity_id <- "DAC-1601-OPP1211228"
-activity_id <- "GB-COH-213890-82604095"
 
 partner_activity_extract <- function(activity_id) {
   
@@ -67,7 +62,7 @@ for (id in iati_activity_ids$iati_id) {
 # Save to Rdata file
 saveRDS(partner_activity_list, file = "Outputs/partner_activity_list.rds")
 # Restore the object
-# partner_activity_list <- readRDS(file = "partner_activity_list.rds")
+# partner_activity_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
 
 # 3) Extract accompanying data ----------------------------------------------
@@ -142,15 +137,24 @@ activity_list_unnest_3 <- activity_list_unnest_3 %>%
 activity_list_unnest_4 <- partner_activity_list %>% 
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
-  select(iati_identifier, role.name, narrative) %>% 
+  select(iati_identifier, role.name, narrative, ref) %>% 
   unnest(cols = narrative,
          keep_empty = TRUE) %>% 
-  select(-lang.code, -lang.name) %>% 
   filter(role.name == "Implementing") %>% 
+  select(-lang.code, -lang.name) %>% 
   unique() %>% 
+  # Add simple country locations based on IATI references
+  mutate(partner_country = case_when(        
+    str_detect(ref, "GB") ~ "United Kingdom", 
+    str_detect(ref, "US") ~ "United States", 
+    str_detect(ref, "NL") ~ "Netherlands"
+  )) %>% 
   group_by(iati_identifier) %>%
+  # Summarise up
   summarise(partner = paste(coalesce(text, ""), collapse = ", "),
-            partner_role = paste(coalesce(role.name, ""), collapse = ", "))
+            partner_role = paste(coalesce(role.name, ""), collapse = ", "),
+            partner_ref = paste(coalesce(ref, ""), collapse = ", "),
+            partner_country = paste(coalesce(partner_country, ""), collapse = ", ")) 
 
 
 # 4) Unlist extending organisations
@@ -226,7 +230,7 @@ activity_list <- activity_list %>%
          activity_title, General, Objectives, country_code, start_date, end_date,
          country_name, country_percentage, sector_code, sector_name,
         # policy_marker_code, policy_marker_name, policy_significance, climate_focus,
-         partner, partner_role, extending_org,
+         partner, partner_role, partner_ref, partner_country, extending_org,
          budget_status, amount, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date())
@@ -234,7 +238,8 @@ activity_list <- activity_list %>%
 # Add Fund label
 activity_list <- activity_list %>%  
     select(-extending_org) %>% 
-    left_join(iati_activity_ids, by = c("iati_identifier" = "iati_id"))
+    left_join(iati_activity_ids, by = c("iati_identifier" = "iati_id")) %>% 
+    rename(programme_id = funding_iati_id)
 
 # Extract countries mentioned in abstract or title
 countries <- countrycode::codelist$country.name.en
@@ -281,3 +286,4 @@ activity_list <- activity_list %>%
 
 # Save to Rdata file
 saveRDS(activity_list, file = "Outputs/partner_activity_list.rds")
+
