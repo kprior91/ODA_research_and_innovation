@@ -1,4 +1,8 @@
-# Extract UK Vaccine Network projects from GtR
+# Script to extract and collate ODA R&I award level data from
+# - UKRI Gateway to Research
+# - NIHR Open Data
+# - IATI Registry 
+#####################################
 
 if (!("googlesheets4" %in% installed.packages())) {
   install.packages("googlesheets4")
@@ -83,7 +87,7 @@ for (fund in c("GCRF", "Newton")) {
       
       projects <- projects %>% 
         mutate(Fund = fund,
-               Funder = "BEIS")
+               Funder = "Department for Business, Energy and Industrial Strategy")
       
       if("participantValues" %in% names(projects)) {
         projects <- projects %>% 
@@ -111,7 +115,7 @@ ukri_projects_by_fund_with_id <- ukri_projects_by_fund %>%
 
 # Format data to join to other GtR ODA projects
 ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>% 
-  mutate(`IATI ID` = "", Stage = "", Funder = "BEIS") %>% 
+  mutate(`IATI ID` = "", Stage = "", Funder = "Department for Business, Energy and Industrial Strategy") %>% 
   select(`IATI ID`, Fund, Funder, extending_org = leadFunder, Stage, `GtR ID`, `Project Title` = title)
 
 
@@ -119,7 +123,7 @@ ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>%
 
 # Read in other ODA UKRI projects
 ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
-  
+
 # Join GCRF/Newton project IDs on  
 ukri_projects_ids <- ukri_projects_ids %>% 
   rbind(ukri_gcrf_newton_ids)
@@ -146,24 +150,24 @@ extract_ukri_projects_by_id <- function(id) {
     org_roles <- data$organisationRole %>% 
       rename(org_name = name) %>% 
       unnest(cols = role) %>% 
-      filter(name %in% c("PARTICIPATING", "COLLABORATOR")) 
-
+      filter(name %in% c("PARTICIPATING", "COLLABORATOR", "PARTICIPANT")) 
+    
     # Collapse partner orgs into single records
     if(length(org_roles$name) > 0) {
+      
+      if("address.country" %in% names(org_roles)) {
+        org_roles_summarised <- org_roles %>% 
+          select(org_name, address.country) %>%
+          summarise(partner_name = paste(org_name, collapse = ", "),
+                    partner_country = paste(address.country[!is.na(address.country)], collapse = ", ")) 
         
-        if("address.country" %in% names(org_roles)) {
-          org_roles_summarised <- org_roles %>% 
-              select(org_name, address.country) %>%
-              summarise(partner_name = paste(org_name, collapse = ", "),
-                        partner_country = paste(address.country[!is.na(address.country)], collapse = ", ")) 
-          
-        } else {
-          org_roles_summarised <- org_roles %>% 
-            select(org_name) %>%
-            summarise(partner_name = paste(org_name, collapse = ", "),
-                      partner_country = "")             
-        }
-        
+      } else {
+        org_roles_summarised <- org_roles %>% 
+          select(org_name) %>%
+          summarise(partner_name = paste(org_name, collapse = ", "),
+                    partner_country = "")             
+      }
+      
     }
     
     # Start constructing data frame
@@ -179,45 +183,43 @@ extract_ukri_projects_by_id <- function(id) {
     if(length(lead_org[["address"]]) > 0) {
       
       lead_org_address <- lead_org[["address"]]
-    
+      
       # Extract lead org country
-          if("country" %in% names(lead_org_address)) {
-            project_data <- project_data %>% 
-              mutate(lead_org_country = lead_org_address$country) 
-              
-          } else {
-            project_data <- project_data %>% 
-              mutate(lead_org_country = "Unknown")              
-          }
-      
-    } else {
-            project_data <- project_data %>% 
-              mutate(lead_org_country = "Unknown")              
-          }
-      
-    # Attach partner org info
-    if(length(org_roles$name) == 0) {
+      if("country" %in% names(lead_org_address)) {
         project_data <- project_data %>% 
-          mutate(partner_org_name = "",
-                 partner_org_country = "")
+          mutate(lead_org_country = lead_org_address$country) 
+        
       } else {
         project_data <- project_data %>% 
-          mutate(partner_org_name = org_roles_summarised$partner_name,
-                 partner_org_country = org_roles_summarised$partner_country)
+          mutate(lead_org_country = "Unknown")              
       }
+      
+    } else {
+      project_data <- project_data %>% 
+        mutate(lead_org_country = "Unknown")              
+    }
+    
+    # Attach partner org info
+    if(length(org_roles$name) == 0) {
+      project_data <- project_data %>% 
+        mutate(partner_org_name = "",
+               partner_org_country = "")
+    } else {
+      project_data <- project_data %>% 
+        mutate(partner_org_name = org_roles_summarised$partner_name,
+               partner_org_country = org_roles_summarised$partner_country)
+    }
     
     # Keep desired fields
-      project_data <- project_data %>% 
-        select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
-               lead_org_name, lead_org_country, partner_org_name, partner_org_country) 
+    project_data <- project_data %>% 
+      select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
+             lead_org_name, lead_org_country, partner_org_name, partner_org_country) 
     
     
     return(project_data)
   }
   
 }
-
-# id = "EP/R013756/1"
 
 # Create empty dataset to hold projects
 ukri_projects_by_id <- data.frame()
@@ -237,49 +239,52 @@ for (id in ukri_projects_ids$`GtR ID`) {
 ### D 
 # Join to fund and funder info from original list
 ukri_projects_by_id_with_id <- ukri_projects_by_id %>% 
-                         left_join(select(ukri_projects_ids, 
-                                          iati_id = `IATI ID`, Fund, Funder,`GtR ID`), by = c("gtr_id" = "GtR ID")) 
+  left_join(select(ukri_projects_ids, 
+                   iati_id = `IATI ID`, Fund, Funder,`GtR ID`), by = c("gtr_id" = "GtR ID")) 
 
 # See which awards from input list have not been found
 missing_awards <- select(ukri_projects_ids, `GtR ID`) %>% 
-                       left_join(select(ukri_projects_by_id_with_id, gtr_id, title), by = c("GtR ID" = "gtr_id")) %>% 
-                       filter(is.na(title)) %>% 
-                       unique()
+  left_join(select(ukri_projects_by_id_with_id, gtr_id, title), by = c("GtR ID" = "gtr_id")) %>% 
+  filter(is.na(title)) %>% 
+  unique()
 
 # Convert all factor fields to character
 ukri_projects_final <- data.frame(lapply(ukri_projects_by_id_with_id, as.character), stringsAsFactors=FALSE)
 
 
 ukri_projects_final <- ukri_projects_final %>% 
-   rename(start_date = fund.start,
-          end_date = fund.end,
-          id = gtr_id,
-          ) %>% 
-   mutate(recipient_country = "",
-          subject = "",
-          amount = as.numeric(amount),
-          status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed")) %>% 
-   select(id,
-          title, 
-          abstract,
-          start_date,
-          end_date,
-          amount,
-          extending_org,
-          lead_org_name,
-          lead_org_country,
-          partner_org_name,
-          partner_org_country,
-          iati_id,
-          Fund,
-          Funder, 
-          recipient_country,
-          subject,
-          status) %>% 
+  rename(start_date = fund.start,
+         end_date = fund.end,
+         id = gtr_id,
+  ) %>% 
+  mutate(recipient_country = "",
+         subject = "",
+         amount = as.numeric(amount),
+         status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed"),
+         Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
+                        if_else(Fund == "Newton", "Newton Fund", Fund))) %>% 
+  select(id,
+         title, 
+         abstract,
+         start_date,
+         end_date,
+         amount,
+         extending_org,
+         lead_org_name,
+         lead_org_country,
+         partner_org_name,
+         partner_org_country,
+         iati_id,
+         Fund,
+         Funder, 
+         recipient_country,
+         subject,
+         status) %>% 
   unique()
 
-
-test <- filter(ukri_projects_final, str_detect(title, "Immunobridging"))
+# Add GtR link to projects
+ukri_projects_final <- ukri_projects_final %>% 
+  mutate(link = paste0("https://gtr.ukri.org/projects?ref=", id))
 
 # Save as R file (to read back in if needed)
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
@@ -288,117 +293,173 @@ saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 
 # 2) Extract NIHR projects ------------------------------------------------
 
-  # Define URL to extract ODA projects
-  path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=100&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&refine.funder=NIHR+(ODA)")
-  
-  # Extract data from the NIHR API
-  request <- GET(url = path)
-  request$status_code # 200 = success
-  
-  # Convert to text and read from JSON
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  
-  # Extract dataframe
-  nihr_projects <- response$records 
-  
-  # Remove unneeded columns
-  nihr_projects <- nihr_projects %>% 
-    select(-1, -2, -3) 
-  
-  # Remove "field." from column names
-  names(nihr_projects) <- gsub(pattern = "fields.", replacement = "", x = names(nihr_projects))
-  
-  # Select order of columns
-  nihr_projects_final <- nihr_projects %>% 
-    mutate(id = "",
-           Funder = "DHSC",
-           Fund = "Global Health Research",
-           recipient_country = "",
-           lead_org_country = ctry17nm,
-           iati_id = "",
-           subject = programme,
-           partner_org_name = "",
-           partner_org_country = "",
-           extending_org = "NIHR") %>% 
-    select(id, 
-           title = project_title,
-           abstract = scientific_abstract,
-           start_date, end_date,
-           amount = award_amount_from_dh,
-           extending_org,
-           lead_org_name = contracted_organisation, 
-           lead_org_country, 
-           partner_org_name, partner_org_country,
-           iati_id, 
-           Fund,
-           Funder,
-           recipient_country,
-           subject,
-           status = project_status)
-  
-  
+# Define URL to extract ODA projects
+path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=100&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&refine.funder=NIHR+(ODA)")
+
+# Extract data from the NIHR API
+request <- GET(url = path)
+request$status_code # 200 = success
+
+# Convert to text and read from JSON
+response <- content(request, as = "text", encoding = "UTF-8")
+response <- fromJSON(response, flatten = TRUE) 
+
+# Extract dataframe
+nihr_projects <- response$records 
+
+# Remove unneeded columns
+nihr_projects <- nihr_projects %>% 
+  select(-1, -2, -3) 
+
+# Remove "field." from column names
+names(nihr_projects) <- gsub(pattern = "fields.", replacement = "", x = names(nihr_projects))
+
+# Select order of columns
+nihr_projects_final <- nihr_projects %>% 
+  mutate(id = project_id,
+         Funder = "Department of Health and Social Care",
+         Fund = "Global Health Research - Programmes",
+         recipient_country = "",
+         lead_org_country = ctry17nm,
+         iati_id = "",
+         subject = programme,
+         partner_org_name = "",
+         partner_org_country = "",
+         extending_org = "NIHR") %>% 
+  select(id, 
+         title = project_title,
+         abstract = scientific_abstract,
+         start_date, end_date,
+         amount = award_amount_from_dh,
+         extending_org,
+         lead_org_name = contracted_organisation, 
+         lead_org_country, 
+         partner_org_name, partner_org_country,
+         iati_id, 
+         Fund,
+         Funder,
+         recipient_country,
+         subject,
+         status = project_status)
+
+# Add NIHR link to awards
+nihr_projects_final <- nihr_projects_final %>% 
+  mutate(link = paste0("https://fundingawards.nihr.ac.uk/award/", id))
+
+
 # 3) Extract IATI projects ------------------------------------------------
 
 # Read in list of IATI activities (from funders and select delivery partners)
-iati_activity_list <- readRDS(file = "Outputs/activity_list.rds")
+iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
-# Filter for known project level information
+# Exclude this activity by British Council as published by PwC: !str_detect(iati_identifier, "GB-CHC-209131-A03172"))
+
+# Filter gov department records for minimum granularity
 iati_projects <- iati_activity_list %>%
-                    filter(str_detect(iati_identifier, "204584") | # FCDO Policy Research Fund
-                           str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
-                           str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
-                           str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
-                           str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
-                           ) %>%   # Component-level FCO activities   
-                    filter(flow_type == "ODA",
-                           !str_detect(iati_identifier, "GB-CHC-209131-A03172")) %>%  
-                    mutate(fund = if_else(str_detect(iati_identifier, "204584"), "204584: Policy Research Fund", 
-                                       if_else(fund == "Other", "Unknown", 
-                                               if_else(is.na(fund), "Unknown", fund))),
-                           activity_description = if_else(str_detect(iati_identifier, "204584"), "", activity_description)) %>%  # remove generic description for Policy Research Fund
-                    plyr::rbind.fill(partner_iati_list) # Add British Council data
+  filter(reporting_org_ref == "GB-GOV-1" | # RED and ex-FCO research coded activities
+           str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
+           str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
+           str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
+           str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
+  ) %>%    
+  filter(flow_type == "ODA") %>% 
+  mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
+  plyr::rbind.fill(partner_iati_list) # Add partner activities
 
 # Keep required fields
 iati_projects_final <- iati_projects %>% 
-                            mutate(id = "",
-                                   Funder = coalesce(gov_funder, if_else(reporting_org_ref %in% c("GB-CHC-209131", "GB-GOV-1"), "FCDO", 
-                                                    if_else(reporting_org_ref == "GB-GOV-7", "Defra", "BEIS"))),
-                                   lead_org_country = "",
-                                   partner_org_name = partner,
-                                   partner_org_country = "",
-                                   extending_org = coalesce(extending_org, if_else(reporting_org_ref == "GB-GOV-1", "FCDO", 
-                                                           if_else(reporting_org_ref == "GB-CHC-209131", "British Council", 
-                                                                   if_else(reporting_org_ref == "GB-GOV-7", "Defra", "UK Space Agency"))))) %>% 
-                            select(id,
-                                   title = activity_title, 
-                                   abstract = activity_description,
-                                   start_date,
-                                   end_date,
-                                   amount,
-                                   extending_org,
-                                   lead_org_name = partner,
-                                   lead_org_country,
-                                   partner_org_name,
-                                   partner_org_country,
-                                   iati_id = iati_identifier,
-                                   Fund = fund,
-                                   Funder, 
-                                   recipient_country = all_countries,
-                                   subject = sector_name,
-                                   status = activity_status
-                                   ) 
-                                    
+  mutate(Funder = coalesce(gov_funder, reporting_org),
+         lead_org_country = "",
+         partner_org_name = "",
+         partner_org_country = "",
+         extending_org = coalesce(extending_org, reporting_org)) %>% 
+  select(id = iati_identifier,
+         title = activity_title, 
+         abstract = activity_description,
+         start_date,
+         end_date,
+         amount,
+         extending_org,
+         lead_org_name = partner,
+         lead_org_country = partner_country,
+         partner_org_name,
+         partner_org_country,
+         iati_id = programme_id,
+         Fund = fund,
+         Funder, 
+         recipient_country = all_countries,
+         subject = sector_name,
+         status = activity_status
+  ) 
+
+# Add IATI link to awards
+iati_projects_final <- iati_projects_final %>% 
+  mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
 
 # Clean up
 rm(request)
 rm(response)
 
 
-# 4) Join 3 sources together ----------------------------------------------
+# 4) Extract Wellcome projects ------------------------------------------------
 
-all_projects <- rbind(ukri_projects_final, nihr_projects_final, iati_projects_final)
+# Read in public data on Wellcome Grants
+wellcome_grants <- read_excel("Inputs/wellcome-grants-awarded-2005-2020.xlsx")
+
+# Read in partnerships data provided by Annie (Jan 21) - restrict to suspected ODA
+wellcome_partnerships <- read_excel("C:/Users/clegge/OneDrive - Wellcome Cloud/Project MODARI/Phase 2 - Implementation/2) Awards/Wellcome/Active Partnership record - 25 01 2021 (ODA labelled).xlsx") %>% 
+  filter(`ODA funding?` %in% c("Yes", "Maybe"),
+         `How the partnership is paid` != "Wellcome pays the partner, the partner pays the awardee",
+         `Partner Organisation(s)` != "Medical Research Council")  # exclude MRC ones - these will be on GtR
+
+# Join the two
+wellcome_grants_comb <- wellcome_grants %>% 
+  inner_join(wellcome_partnerships, by = c("Internal ID" = "Reference")) 
+
+# Add missing fields and format Funder/Fund field
+wellcome_grants_comb <- wellcome_grants_comb %>% 
+  mutate(status = if_else(Sys.Date() <= `Planned Dates:End Date`, "Active", "Closed"),
+         extending_org = "Wellcome Trust",
+         partner_org_name = "",
+         partner_org_country = "",
+         recipient_country = "",
+         Funder = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"), 
+                          "Department of Health and Social Care", `Partner Organisation(s)`),
+         Fund = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"),
+                        "Global Health Research - Partnerships", "Research & Evidence Division")) 
+
+# Select desired variables
+wellcome_grants_comb <- wellcome_grants_comb %>% 
+  select(id = `Internal ID`,
+         title = Title.x, 
+         abstract = Description,
+         start_date = `Planned Dates:Start Date`,
+         end_date = `Planned Dates:End Date`,
+         amount = `Amount Awarded`,
+         extending_org,
+         lead_org_name = `Recipient Org:Name`,
+         lead_org_country = `Recipient Org:Country`,
+         partner_org_name,
+         partner_org_country,
+         iati_id = `Partnership Name`,
+         Fund,
+         Funder, 
+         recipient_country,
+         subject = `Master Grant Type Name`,
+         status
+  ) 
+
+# Format date fields for merging
+wellcome_grants_final <- wellcome_grants_comb %>% 
+  mutate(start_date = as.character(start_date),
+         end_date = as.character(end_date),
+         link = "https://wellcome.org/grant-funding/funded-people-and-projects")
+
+
+# 5) Join 3 sources together ----------------------------------------------
+
+all_projects <- rbind(ukri_projects_final, nihr_projects_final, iati_projects_final, wellcome_grants_final)
 
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
@@ -406,7 +467,7 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 
 # Change terminology around award status
 all_projects <- all_projects %>% 
-                  mutate(status = if_else(status %in% c("Contracted", "Implementation"), "Active", status))
+  mutate(status = if_else(status %in% c("Contracted", "Implementation"), "Active", status))
 
 
 # 5) Extract countries -----------------------------------
@@ -416,19 +477,19 @@ countries <- countrycode::codelist$country.name.en
 countries_string <- paste0(countries, collapse = "|")
 
 countries_in_description <- all_projects %>% 
-      mutate(text = paste0(title, " ", abstract)) %>% 
-      select(title, text) %>% 
-      mutate(countries_abstract = str_extract_all(text, countries_string)) %>% 
-      unnest(cols = countries_abstract) %>% 
-      unique() %>% 
-      group_by(title) %>% 
-      summarise(countries_abstract = paste(coalesce(countries_abstract, ""), collapse = ", "))
+  mutate(text = paste0(title, " ", abstract)) %>% 
+  select(title, text) %>% 
+  mutate(countries_abstract = str_extract_all(text, countries_string)) %>% 
+  unnest(cols = countries_abstract) %>% 
+  unique() %>% 
+  group_by(title) %>% 
+  summarise(countries_abstract = paste(countries_abstract[!is.na(countries_abstract)], collapse = ", "))
 
-
+# Add the country mentioned field onto main dataset
 all_projects_final <- all_projects %>% 
   left_join(countries_in_description, by = "title") %>% 
-  mutate(partner_countries = paste0(lead_org_country, ",", partner_org_country),
-         countries_abstract = paste0(recipient_country, ",", countries_abstract)) 
+  mutate(partner_countries = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, "")),
+         countries_abstract = paste0(coalesce(recipient_country, ""), ", ", coalesce(countries_abstract, "")))
 
 # Add ID
 all_projects_final$ID <- seq.int(nrow(all_projects_final))
@@ -438,8 +499,10 @@ countries_data <- all_projects_final %>%
   select(ID, countries_abstract, partner_countries) %>%
   gather(key = "country_type", value = "Country", -ID) %>% 
   right_join(select(all_projects_final, -countries_abstract, -partner_countries), by = "ID") %>% 
-  mutate(Country = str_replace_all(Country, "NA", ""),
+  mutate(Country = str_replace_all(Country, "NA", "Unknown"),
          Country = str_replace_all(Country, ",,", ","))
+
+
 
 
 # 6) Separate out lead, partner countries ---------------------------------
@@ -483,9 +546,39 @@ all_projects_split_country <- all_projects_split_country %>%
 
 all_projects_final <- countries_data %>% 
   rename(all_countries = Country) %>% 
- # select(-country_type) %>% 
+  # select(-country_type) %>% 
   left_join(all_projects_split_country, by = c("ID", "country_type")) %>% 
   mutate(date_refreshed = Sys.Date())
+
+# 
+# # Count how many countries by project id
+# partner_country_count <- all_projects_final %>% 
+#   select(ID, country_type, Country) %>% 
+#   filter(country_type == "partner_countries",
+#          !is.na(Country)) %>% 
+#   unique() %>% 
+#   mutate(label = "abstract_cleaned")
+# 
+# abstract_country_count <- all_projects_final %>% 
+#   select(ID, country_type, Country) %>% 
+#   filter(country_type == "countries_abstract",
+#          !is.na(Country)) %>% 
+#   unique() %>% 
+#   mutate(label = "partner_cleaned")
+# 
+# counts_comb <- rbind(partner_country_count, abstract_country_count)
+# 
+# 
+# # Merge back to main dataset
+# all_projects_cleaned <- all_projects_final %>% 
+#   left_join(counts_comb, by = c("ID", "country_type", "Country")) %>% 
+#   filter(!is.na(label) | is.na(Country))
+
+
+# Keep required fields only (to minimise output size)
+
+# all_projects_final <- all_projects_final %>% 
+#   select()
 
 
 # Write to RDS ----
@@ -508,7 +601,24 @@ results_sheet <- sheet_write(all_projects_final,
 
 # --------------------------------------------------------------------------
 # testing
+
+# check list of ODA R&I funds
+unique(all_projects_final$Fund)
+
+test <- filter(all_projects_final, Fund == "Unknown")
+
+# check list of ODA R&I funders
+unique(all_projects_final$Funder)
+
+# Check a delivery partner
 test <- filter(all_projects_final, extending_org == "British Council")
 
-test <- filter(all_projects_final, str_detect(title, "immunobridging"))
+# test GtR Innovate UK example (partner available online, not extracted via API)
+test <- filter(ukri_projects_final, str_detect(title, "SmartCoop"))
 
+# test dates in Wellcome projects
+test <- filter(wellcome_grants_comb, )
+
+# Check countries
+test <- filter(all_projects_final, Country == "Unknown")
+test <- filter(all_projects_final, is.na(Country))
