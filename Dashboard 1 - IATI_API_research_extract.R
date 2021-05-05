@@ -154,12 +154,16 @@ saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final.rds")
 
 # Filter activities by fund (BEIS GCRF/Newton, DHSC GHS/GHR, FCDO RED)
 RED_programmes <- read_excel("Inputs/RED programme IDs.xlsx") %>% 
-  mutate(red_iati_id = paste0("GB-1-", ProjectID))
+  mutate(red_iati_id_1 = paste0("GB-1-", ProjectID),
+         red_iati_id_2 = paste0("GB-GOV-1-", ProjectID))
 
-RED_programme_codes <- paste(RED_programmes$red_iati_id, collapse="|")
+
+RED_programme_codes <- c(RED_programmes$red_iati_id_1, RED_programmes$red_iati_id_2)
+
+RED_programme_codes <- paste(RED_programme_codes, collapse="|")
 
 uk_gov_list_filtered <- uk_gov_list_final %>% 
-  filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52") | str_detect(iati_identifier, "GB-GOV-3")) |  # Other UK gov deps (including ex-FCO)
+  filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52", "GB-GOV-10") | str_detect(iati_identifier, "GB-GOV-3")) |  # Other UK gov deps (including ex-FCO)
          (reporting_org.ref == "GB-GOV-1" & str_detect(iati_identifier, RED_programme_codes)) |   # FCDO RED programmes
          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN"),   # Keep BEIS Newton/GCRF and DHSC GHS/GHR
          default_flow_type == "ODA")                                            # ODA only
@@ -256,14 +260,30 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
   mutate(partner_country = case_when(        
     str_detect(ref, "GB-") ~ "United Kingdom", 
     str_detect(ref, "US-") ~ "United States", 
-    str_detect(ref, "NL-") ~ "Netherlands"
-  )) %>% 
-  group_by(iati_identifier) %>%
-  # Summarise up
+    str_detect(ref, "NL-") ~ "Netherlands",
+    str_detect(ref, "CA-") ~ "Canada",
+    str_detect(ref, "IN-") ~ "India"
+  ))
+
+gov_list_unnest_4_countries <- gov_list_unnest_4 %>% 
+  select(iati_identifier, partner_country) %>% 
+  unique() %>% 
+  filter(!is.na(partner_country)) %>% 
+  group_by(iati_identifier) %>% 
+  summarise(partner_country = paste(partner_country, collapse = ", "))
+
+gov_list_unnest_4_partners <- gov_list_unnest_4 %>% 
+  select(iati_identifier, text, role.name, ref) %>% 
+  unique() %>% 
+  filter(!is.na(text)) %>% 
+  group_by(iati_identifier) %>% 
   summarise(partner = paste(coalesce(text, ""), collapse = ", "),
             partner_role = paste(coalesce(role.name, ""), collapse = ", "),
-            partner_ref = paste(coalesce(ref, ""), collapse = ", "),
-            partner_country = paste(coalesce(partner_country, ""), collapse = ", ")) 
+            partner_ref = paste(coalesce(ref, ""), collapse = ", ")) 
+
+gov_list_unnest_4 <- gov_list_unnest_4_partners %>% 
+  left_join(gov_list_unnest_4_countries, by = "iati_identifier")
+
 
 # E) Unlist extending organisations
 gov_list_unnest_5 <- uk_gov_list_filtered %>% 
@@ -389,16 +409,16 @@ gov_list <- gov_list %>%
     (str_detect(iati_identifier, "NIHR") | str_detect(activity_title, "NIHR")) ~ "Global Health Research - Programmes",
     str_detect(iati_identifier, "ICF") ~ "International Climate Finance (ICF)",
     str_detect(iati_identifier, "Chevening") ~ "Chevening",
-    str_detect(iati_identifier, RED_programme_codes) ~ "Research & Evidence Division",
+    str_detect(iati_identifier, RED_programme_codes) ~ "FCDO Research & Innovation",
     TRUE ~ "Other"
   ))
 
 # Correct Funder names
 gov_list <- gov_list %>%  
   mutate(reporting_org = case_when(
-    reporting_org_ref == "GB-GOV-1" ~ "Foreign, Commonwealth & Development Office",
-    str_detect(reporting_org, "Health") ~ "Department of Health & Social Care",
-    str_detect(reporting_org, "Culture") ~ "Department for Digital, Culture, Media & Sport",
+    reporting_org_ref == "GB-GOV-1" ~ "Foreign, Commonwealth and Development Office",
+    str_detect(reporting_org, "Health") ~ "Department of Health and Social Care",
+    str_detect(reporting_org, "Culture") ~ "Department for Digital, Culture, Media and Sport",
     TRUE ~ reporting_org
   )) %>% 
   mutate(reporting_org = str_replace_all(reporting_org, "UK - ", ""))
@@ -453,11 +473,19 @@ gov_list_final <- gov_list_final %>%
                                         General))
 
 
+# --------------
+
+# check list of ODA R&I funds
+unique(gov_list_final$fund)
+
+# check list of ODA R&I funders
+unique(gov_list_final$reporting_org)
+
 #---------------
   
 # Save to Rdata file
 saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
-
+# gov_list_final <- readRDS("Outputs/gov_list_final.rds") 
 
 # Save to Excel
 write_xlsx(x = list(`IATI research` = gov_list_final), 
