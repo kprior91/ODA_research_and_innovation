@@ -113,3 +113,8 @@ red_linked_activites <- transactions_dataset %>%
          linked_activity = iati_identifier)
 
 rm(transactions_dataset)
+
+# Save to Rdata file
+saveRDS(red_linked_activites, file = "Outputs/red_linked_activites.rds")
+# Restore the object
+# red_linked_activites <- readRDS(file = "Outputs/red_linked_activites.rds")

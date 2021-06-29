@@ -1,5 +1,5 @@
 # --------------------------------------------------------------- #
-# Extract ODA research activitie from public IATI data #
+# Extract ODA research activities from public IATI data #
 # --------------------------------------------------------------- #
 
 if (!("jsonlite" %in% installed.packages())) {

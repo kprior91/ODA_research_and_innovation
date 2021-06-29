@@ -289,6 +289,7 @@ ukri_projects_final <- ukri_projects_final %>%
   mutate(recipient_country = "",
          subject = "",
          amount = as.numeric(amount),
+         currency = "GBP",
          status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed"),
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
                         if_else(Fund == "Newton", "Newton Fund", Fund))) %>% 
@@ -298,6 +299,7 @@ ukri_projects_final <- ukri_projects_final %>%
          start_date,
          end_date,
          amount,
+         currency,
          extending_org,
          lead_org_name,
          lead_org_country,
@@ -352,6 +354,7 @@ nihr_projects_final <- nihr_projects %>%
          lead_org_country = ctry17nm,
          iati_id = "",
          subject = programme,
+         currency = "GBP",
          partner_org_name = "",
          partner_org_country = "",
          extending_org = "NIHR") %>% 
@@ -360,6 +363,7 @@ nihr_projects_final <- nihr_projects %>%
          abstract = scientific_abstract,
          start_date, end_date,
          amount = award_amount_from_dh,
+         currency,
          extending_org,
          lead_org_name = contracted_organisation, 
          lead_org_country, 
@@ -384,7 +388,8 @@ partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
 # Filter gov department records for minimum granularity
 iati_projects <- iati_activity_list %>%
-  filter(reporting_org_ref == "GB-GOV-1" | # RED and ex-FCO research coded activities
+  filter(  str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
+           #reporting_org_ref == "GB-GOV-1" | # RED and ex-FCO research coded activities
            str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
            str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
            str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
@@ -411,6 +416,7 @@ iati_projects_final <- iati_projects %>%
          start_date,
          end_date,
          amount,
+         currency,
          extending_org,
          lead_org_name = partner,
          lead_org_country = partner_country,
@@ -452,6 +458,7 @@ wellcome_grants_comb <- wellcome_grants %>%
 wellcome_grants_comb <- wellcome_grants_comb %>% 
   mutate(status = if_else(Sys.Date() <= `Planned Dates:End Date`, "Active", "Closed"),
          extending_org = "Wellcome Trust",
+         currency = "GBP",
          partner_org_name = "",
          partner_org_country = `Research Location Countries`,
          recipient_country = "",
@@ -468,6 +475,7 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          start_date = `Planned Dates:Start Date`,
          end_date = `Planned Dates:End Date`,
          amount = `Amount Awarded`,
+         currency,
          extending_org,
          lead_org_name = `Recipient Org:Name`,
          lead_org_country = `Recipient Org:Country`,
@@ -604,18 +612,6 @@ duplicate_country_projects <- filter(all_projects_final,
                               unique() %>% 
                               filter(id %in% missing_country_projects$id) 
 
-
-# Look at examples of the 2 cases (abstract/beneficiary missing vs. partner country missing)
-# test <- filter(all_projects_final, id == "MR/K006533/1")
-# test1 <- filter(missing_country_projects, id == "MR/K006533/1")   # records to exclude
-# test2 <- filter(duplicate_country_projects, id == "MR/K006533/1")
-# 
-# 
-# test <- filter(all_projects_final, id == "GB-1-205121-101")
-# test1 <- filter(missing_country_projects, id == "GB-1-205121-101")    # records to exclude
-# test2 <- filter(duplicate_country_projects, id == "GB-1-205121-101")
-
-
 # Exclude project records with unknown/missing abstract or beneficiary country AND
 # a populated other country record
 all_projects_tidied <- all_projects_final %>% 
@@ -683,4 +679,24 @@ results <- as_sheets_id(ODA_RI_url)
 results_sheet <- sheet_write(all_projects_tidied,
                              ss = results,
                              sheet = "ODA_RI_projects")
+
+
+# Testing
+
+test <- filter(all_projects_tidied, extending_org == "AgResults")
+test <- filter(partner_activity_comb, reporting_org == "AgResults")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
