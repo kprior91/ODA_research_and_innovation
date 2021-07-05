@@ -174,7 +174,7 @@ all_projects_tidied <- all_projects_tidied %>%
 # 3) Check data -----------------------------------
 
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO Research & Innovation", Fund),
+  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO fully funded", Fund),
          Funder = if_else(Funder == "Foreign, Commonwealth & Development Office", "Foreign, Commonwealth and Development Office", Funder)) 
 
 # check list of ODA R&I funds

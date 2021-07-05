@@ -445,7 +445,7 @@ rm(response)
 wellcome_grants <- read_excel("Inputs/wellcome-grants-awarded-2005-2020.xlsx")
 
 # Read in partnerships data provided by Annie (Jan 21) - restrict to suspected ODA
-wellcome_partnerships <- read_excel("C:/Users/clegge/OneDrive - Wellcome Cloud/Project MODARI/Phase 2 - Implementation/2) Awards/Wellcome/Active Partnership record - 25 01 2021 (ODA labelled).xlsx") %>% 
+wellcome_partnerships <- read_excel("Inputs/Active Partnership record - 25 01 2021 (ODA labelled).xlsx") %>% 
   filter(`ODA funding?` %in% c("Yes", "Maybe"),
          `How the partnership is paid` != "Wellcome pays the partner, the partner pays the awardee",
          `Partner Organisation(s)` != "Medical Research Council")  # exclude MRC ones - these will be on GtR
@@ -465,7 +465,7 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          Funder = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"), 
                           "Department of Health and Social Care", `Partner Organisation(s)`),
          Fund = if_else(Funder == "Department of Health and Social Care",
-                        "Global Health Research - Partnerships", "FCDO Research and Evidence Division")) 
+                        "Global Health Research - Partnerships", "FCDO partially funded")) 
 
 # Select desired variables
 wellcome_grants_comb <- wellcome_grants_comb %>% 
@@ -528,10 +528,15 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          iati_id = `FCDO programme - IATI ID`
          ) %>% 
   mutate(currency = "GDP",
+         start_date = as.character(start_date),
+         end_date = as.character(end_date),
          Fund = "FCDO fully funded",
          Funder = "Foreign, Commonwealth and Development Office",
+         subject = "",
+         status = if_else(end_date >= Sys.Date(), "Active", "Closed"),
+         link = ""
          ) %>% 
-  select(-`No.`, -`FCDO programme - name`, -Notes)
+  select(-`No.`, -`FCDO programme - name`, -Notes, -file_number)
 
 
 # 6) Join 4 sources together ----------------------------------------------
