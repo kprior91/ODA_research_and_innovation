@@ -129,10 +129,22 @@ for (org in org_code) {
   }
 }
 
+# 2.A) Unlist activity titles and subset for those that mention FCDO/DFID
+# (Gates only)
 
-# 2) Unlist participating funding organisations and subset for FCDO
+partner_activities_via_title <- org_activity_list %>% 
+  filter(reporting_org.ref == "DAC-1601") %>% 
+  unnest(cols = title.narrative,
+         keep_empty = TRUE) %>% 
+  filter(str_detect(text, "FCDO|DFID")) %>% 
+  mutate(gov_funder = "Foreign, Commonwealth and Development Office",
+         fund = "FCDO fully funded") %>% 
+  select(iati_identifier, gov_funder, fund) %>% 
+  unique()
 
-partner_activities_fcdo <- org_activity_list %>% 
+# 2.B) Unlist participating funding organisations and subset for FCDO
+
+partner_activities_via_funder <- org_activity_list %>% 
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative, ref, activity_id) %>% 
@@ -159,8 +171,12 @@ partner_activities_fcdo <- org_activity_list %>%
   select(iati_identifier, activity_id, gov_funder, fund) %>% 
   unique()
 
+# Combine 2A and 2B
+partner_activities <- plyr::rbind.fill(partner_activities_via_title, partner_activities_via_funder)
+
+# Join back to original data
 partner_activities <- org_activity_list %>% 
-  inner_join(partner_activities_fcdo, by = "iati_identifier")
+  inner_join(partner_activities, by = "iati_identifier")
 
 
 ### C) Combine individual with partner activities (extractions A and B above) ---- 
@@ -169,7 +185,8 @@ partner_activity_comb <- plyr::rbind.fill(partner_activity_extract, partner_acti
   rename(fcdo_activity_id = activity_id)
 
 rm(partner_activity_extract)
-rm(partner_activities_fcdo)
+rm(partner_activities_via_title)
+rm(partner_activities_via_funder)
 rm(partner_activities)
 
 
