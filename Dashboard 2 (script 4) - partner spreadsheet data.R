@@ -208,6 +208,11 @@ test3 <- filter(all_projects_tidied,
 # Unknown country should be for the activity location only
 unique(test2$country_type)
 
+# TEMPORARY ***
+# Remove IDRC DHSC IATI data
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"))
+
 
 # 4) Write data --------------------------------
 

@@ -36,7 +36,7 @@ component_list <- data.frame()
 
 component_extract <- function(activity_id) {
   
-  path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
+  path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
@@ -84,7 +84,7 @@ transactions_dataset <- data.frame()
 for (id in all_red_activities$component_id) {
   
   print(id)
-  path <- paste0("https://iatidatastore.iatistandard.org/api/transactions/?provider_activity=", id, "&format=json&page_size=20")
+  path <- paste0("https://iati.cloud/api/transactions/?provider_activity=", id, "&format=json&page_size=20")
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 

@@ -525,18 +525,17 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          lead_org_country = `Lead organisation - country`,
          partner_org_name = `Implementing partner(s) - name`,
          partner_org_country = `Implementing partner(s) - country`,
-         iati_id = `FCDO programme - IATI ID`
+         iati_id = `Funder programme - IATI ID`,
+         link = `Data source`
          ) %>% 
-  mutate(currency = "GDP",
-         start_date = as.character(start_date),
+  mutate(start_date = as.character(start_date),
          end_date = as.character(end_date),
-         Fund = "FCDO fully funded",
-         Funder = "Foreign, Commonwealth and Development Office",
+         currency = coalesce(Currency, "GDP"),
          subject = "",
-         status = if_else(end_date >= Sys.Date(), "Active", "Closed"),
-         link = ""
+         status = if_else(end_date >= Sys.Date(), "Active", "Closed")
          ) %>% 
-  select(-`No.`, -`FCDO programme - name`, -Notes, -file_number)
+  select(-`No.`, -`Funder programme - name`, -Notes, -file_number, -Currency,
+         -`Aims/Objectives`, -`Investigator(s) - name`)
 
 
 # 6) Join 4 sources together ----------------------------------------------

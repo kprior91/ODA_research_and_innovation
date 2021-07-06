@@ -39,8 +39,8 @@ iati_activity_ids <- iati_activity_ids %>%
 # 3) Extract specified partner activities from IATI Registry 
 iati_activity_extract <- function(activity_id) {
   
-  path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
-  #path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?q=", activity_id, "&q_fields=iati_identifier&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
+  path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
+  #path <- paste0("https://iati.cloud/api/activities/?q=", activity_id, "&q_fields=iati_identifier&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
@@ -57,8 +57,8 @@ iati_activity_extract <- function(activity_id) {
 }
 
 # Exanples - activities that aren't extracted
-# https://iatidatastore.iatistandard.org/api/activities/?iati_identifier=GB-CHC-287287-DFID-PEDL
-# https://iatidatastore.iatistandard.org/api/activities/?iati_identifier=XM-DAC-47015-18199_BILATERAL_UNITEDKINGDOM-DFID-DEPARTMENTFORINTERNATIONALDEVELOPMENT_ILRI
+# https://iati.cloud/api/activities/?iati_identifier=GB-CHC-287287-DFID-PEDL
+# https://iati.cloud/api/activities/?iati_identifier=XM-DAC-47015-18199_BILATERAL_UNITEDKINGDOM-DFID-DEPARTMENTFORINTERNATIONALDEVELOPMENT_ILRI
 
 # Prepare results data frame and counters
 partner_activity_extract <- data.frame()
@@ -90,7 +90,7 @@ org_code <- c(
 
 # Function to extract CGIAR + IDRC activities
 org_activity_extract <- function(page, org_code) {
-  path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
+  path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
