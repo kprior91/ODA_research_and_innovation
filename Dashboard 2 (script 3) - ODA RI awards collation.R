@@ -58,6 +58,21 @@ library(tidyverse)
 library(writexl)
 library(readxl)
 
+# -- Read in GRID data
+# Match institutions to countries with GRID database
+grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
+  select(grid_id, name) %>% 
+  unique()  %>% 
+    # Remove common organisation names
+  filter(!(name %in% c("Ministry of Health", "Ministry of Public Health")))
+
+grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>% 
+  select(grid_id, country, country_code) %>% 
+  unique()
+
+grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
+
+
 # 1) Extract UKRI projects -------------------------------------------
 
 ### A - GCRF/Newton IDs ###
@@ -130,7 +145,6 @@ ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", shee
 ukri_projects_ids <- ukri_projects_ids %>% 
   rbind(ukri_gcrf_newton_ids)
 
-
 ### c - Extract project info from GtR API ###
 
 extract_ukri_projects_by_id <- function(id) {
@@ -175,25 +189,10 @@ extract_ukri_projects_by_id <- function(id) {
         
       } else {
         
-       # org_countries$partner_country <- 
-        
         org_countries <- org_roles %>% 
           select(country) %>% 
           unique() %>% 
           summarise(partner_country = paste(country[!is.na(country)], collapse = ", "))
-        
-      }
-        
-      #   org_roles_summarised <- org_roles %>% 
-      #     select(org_name, address.country) %>%
-      #     summarise(partner_name = paste(org_name, collapse = ", "),
-      #               partner_country = paste(address.country[!is.na(address.country)], collapse = ", ")) 
-      #   
-      # } else {
-      #   org_roles_summarised <- org_roles %>% 
-      #     select(org_name) %>%
-      #     summarise(partner_name = paste(org_name, collapse = ", "),
-      #               partner_country = "")             
       
       org_roles_summarised <- cbind(org_names, org_countries)
       
@@ -555,11 +554,6 @@ all_projects$ID <- seq.int(nrow(all_projects))
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
 # all_projects <- readRDS("Outputs/all_projects.rds") 
-
-
-
-
-
 
 
 

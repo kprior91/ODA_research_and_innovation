@@ -58,51 +58,27 @@ library(readxl)
 # Save as R file (from previous script)
 all_projects <- readRDS("Outputs/all_projects.rds") 
 
-
 # 1) Extract countries -----------------------------------
-
-# Extract countries mentioned in abstract or title
-countries <- countrycode::codelist$country.name.en
-countries_string <- paste0(countries, collapse = "|")
-
-countries_in_description <- all_projects %>% 
-  mutate(text = paste0(title, " ", abstract)) %>% 
-  select(title, text) %>% 
-  mutate(countries_abstract = str_extract_all(text, countries_string)) %>% 
-  unnest(cols = countries_abstract) %>% 
-  unique() 
-
-# Correct Niger / Nigeria problem
-countries_in_description <- countries_in_description %>% 
-  mutate(countries_abstract = if_else(str_detect(text, "Nigeria") & !str_detect(text, "Niger ") & countries_abstract == "Niger",
-                                      "Nigeria", countries_abstract))
-
-# Aggregate list of countries up
-countries_in_description <- countries_in_description %>% 
-  group_by(title) %>% 
-  summarise(countries_abstract = paste(countries_abstract[!is.na(countries_abstract)], collapse = ", "))
-
 
 # Add the country mentioned field onto main dataset
 all_projects_final <- all_projects %>% 
-  left_join(countries_in_description, by = "title") %>% 
-  mutate(partner_countries = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, "")),
-         countries_abstract = paste0(coalesce(recipient_country, ""), ", ", coalesce(countries_abstract, "")))
+  mutate(location_country = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, "")),
+         beneficiary_country = recipient_country)
 
-
-# Distinguish between abstract and partner countries
+# Convert location vs. recipient country data to long format
 countries_data <- all_projects_final %>% 
-  select(ID, countries_abstract, partner_countries) %>%
+  select(ID, beneficiary_country, location_country) %>%
   gather(key = "country_type", value = "Country", -ID) %>% 
-  right_join(select(all_projects_final, -countries_abstract, -partner_countries), by = "ID") %>% 
+  right_join(select(all_projects_final, -beneficiary_country, -location_country), by = "ID") %>% 
   mutate(Country = str_replace_all(Country, "NA", "Unknown"),
          Country = str_replace_all(Country, ",,", ","))
 
-
-# Separate out lead, partner countries 
+# Create one row per country
 all_projects_split_country <- countries_data %>%
   select(ID, country_type, Country) %>% 
   mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of,|Tanzania, United Republic of,", "Tanzania,")) %>%
+  mutate(Country = str_replace_all(Country, ";", ",")) %>%
+  mutate(Country = gsub("\\s*\\([^\\)]+\\)","", as.character(Country))) %>%
   separate_rows(Country, sep = ",", convert = FALSE) %>%
   mutate(Country = str_trim(Country)) %>% 
   mutate(Country = str_replace_all(Country, c("UK|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM"), "United Kingdom"),
@@ -137,8 +113,9 @@ all_projects_split_country <- all_projects_split_country %>%
 
 # Join countries to project data
 all_projects_final <- countries_data %>% 
+  # remove commas at start
+  mutate(Country = if_else(substr(Country, 1, 1) == ",", substr(Country, 2, length(Country)-1), Country)) %>% 
   rename(all_countries = Country) %>% 
-  # select(-country_type) %>% 
   left_join(all_projects_split_country, by = c("ID", "country_type")) %>% 
   mutate(date_refreshed = Sys.Date())
 
@@ -163,12 +140,21 @@ duplicate_country_projects <- filter(all_projects_final,
 # a populated other country record
 all_projects_tidied <- all_projects_final %>% 
   left_join(missing_country_projects, by = c("ID", "id", "country_type")) %>% 
-  filter(!(exclude_flag == 1 & country_type == "countries_abstract" & (Country %in% c("Unknown") | is.na(Country))))
+  filter(!(exclude_flag == 1 & country_type == "beneficiary_country" & (Country %in% c("Unknown") | is.na(Country))))
 
 # Label unknown/missing countries as "Unknown" to remove NULLs from Tableau map
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Country = if_else(is.na(Country), "Unknown", Country))
+  mutate(Country = if_else(is.na(Country), "Unknown", Country)) %>% 
+  select(-exclude_flag)
 
+# Add FCDO programme ID
+all_projects_tidied <- all_projects_tidied %>% 
+    # remove any text before "-1-" in the FCDO IATI ID
+  mutate(fcdo_programme_id = if_else(Funder == "Foreign, Commonwealth and Development Office"
+                                     & str_detect(iati_id, "-1-"),
+                                     sub(".*-1-", "", iati_id), "")) %>% 
+    # remove any FCDO component numbers
+  mutate(fcdo_programme_id = sub("-.*", "", fcdo_programme_id))
 
 
 # 3) Check data -----------------------------------

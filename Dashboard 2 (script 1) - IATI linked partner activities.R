@@ -66,7 +66,25 @@ for (id in red_programmes$red_iati_id) {
 
 programme_list <- data.frame(component_id = red_programmes$red_iati_id)
 
-all_red_activities <- rbind(programme_list, component_list)
+non_RED_components <- c("GB-1-203185-106",
+                        "GB-1-204624-105",
+                        "GB-1-204624-108",
+                        "GB-1-204695-103",
+                        "GB-1-204695-108",
+                        "GB-1-204695-111",
+                        "GB-1-205219-102",
+                        "GB-1-205222-103",
+                        "GB-GOV-1-300397-105",
+                        "GB-GOV-1-300552-107",
+                        "GB-GOV-1-300606-102",
+                        "GB-GOV-1-300936-102",
+                        "GB-GOV-1-301168-105",
+                        "GB-GOV-1-301168-106",
+                        "GB-GOV-1-301168-107")
+
+all_red_activities <- rbind(programme_list, 
+                            component_list,
+                            non_RED_components)
 
 # Remove intermediary datasets
 rm(red_programmes)
