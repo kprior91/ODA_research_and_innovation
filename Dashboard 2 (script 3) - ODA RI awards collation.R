@@ -548,9 +548,6 @@ all_projects <- rbind(ukri_projects_final, nihr_projects_final,
 all_projects <- all_projects %>% 
   mutate(status = if_else(status %in% c("Contracted", "Implementation"), "Active", status))
 
-# Add ID field to dataset
-all_projects$ID <- seq.int(nrow(all_projects))
-
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
 # all_projects <- readRDS("Outputs/all_projects.rds") 

@@ -199,6 +199,9 @@ unique(test2$country_type)
 all_projects_tidied <- all_projects_tidied %>% 
   filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"))
 
+# Add row ID field to dataset
+all_projects$row_id <- seq.int(nrow(all_projects_tidied))
+
 
 # 4) Write data --------------------------------
 
