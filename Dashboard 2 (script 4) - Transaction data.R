@@ -79,10 +79,18 @@ transactions_unnest <- transaction_list %>%
   # select fields to keep
   select(iati_identifier, start_date = transaction_date, 
          title, recipient_country, subject, currency, amount = value, lead_org_name) %>% 
+  
+    # sum amounts over multiple payments
+  group_by(iati_identifier, title, recipient_country, currency, subject, lead_org_name) %>%
+  summarise(start_date = min(start_date),
+            amount = sum(as.numeric(amount))) %>%
+  unique() %>% 
+
   mutate(partner_org_name = "",
          partner_org_country = "",
          lead_org_country = "",
          end_date = "")
+
 
 # C) Join information back to master dataset ----
 
@@ -93,7 +101,14 @@ all_projects <- readRDS("Outputs/all_projects.rds")
 all_projects_subset <- all_projects %>% 
   filter(id %in% id_list) %>% 
   select(id, abstract, extending_org, iati_id, Fund, Funder, status, link) %>% 
-  left_join(transactions_unnest, by = c("id" = "iati_identifier"))
+  unique() %>% 
+  left_join(transactions_unnest, by = c("id" = "iati_identifier")) 
+
+all_projects_subset$id_suffix <- seq.int(nrow(all_projects_subset))
+
+all_projects_subset <- all_projects_subset %>% 
+  mutate(id = paste0(id, "-", id_suffix)) %>% 
+  select(-id_suffix)
 
 # Replace original single line activities in master file
 all_projects_transactions <- all_projects %>% 
@@ -108,4 +123,7 @@ saveRDS(all_projects_transactions, file = "Outputs/all_projects_transactions.rds
 
 # E) Check ----
 
-test <- filter(all_projects_transactions, str_detect(extending_org, "Elrha"))
+test <- filter(all_projects_transactions, str_detect(extending_org, "Abdul"))
+
+# check id field is unique
+length(unique(all_projects_transactions$id))

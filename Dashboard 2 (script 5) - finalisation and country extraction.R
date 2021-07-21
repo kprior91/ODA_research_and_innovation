@@ -171,6 +171,7 @@ all_projects_tidied <- all_projects_tidied %>%
 unique(all_projects_tidied$Fund)
 
 test <- filter(all_projects_tidied, is.na(Fund))
+
 nrow(test)
 
 # check list of ODA R&I funders
@@ -210,6 +211,11 @@ all_projects_tidied <- all_projects_tidied %>%
 saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
 # all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
+# Limit size and number of columns for writing
+all_projects_tidied <- all_projects_tidied %>% 
+ # select(-subject, -all_countries, -date_refreshed) %>% 
+  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2)) %>% 
+  unique()
 
 # Write data to EC google drive 
 # Authorise googlesheets4 to view and manage sheets on EC Drive
@@ -228,7 +234,6 @@ results_sheet <- sheet_write(all_projects_tidied,
 test <- filter(all_projects, extending_org == "Global Disability Innovation Hub")
 
 test2 <- filter(all_projects_final, extending_org == "Institute of Development Studies")
-
 
 test <- filter(all_projects_tidied, str_detect(fcdo_programme_id, "300211"))
 
