@@ -4,6 +4,8 @@
 # - UKRI Gateway to Research
 # - NIHR Open Data
 # - IATI Registry 
+# - Wellcome Trust (spreadsheet)
+# - FCDO partners (spreadsheets)
 #####################################
 
 if (!("googlesheets4" %in% installed.packages())) {
@@ -388,7 +390,8 @@ partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 # Filter gov department records for minimum granularity
 iati_projects <- iati_activity_list %>%
   filter(  str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
-           #reporting_org_ref == "GB-GOV-1" | # RED and ex-FCO research coded activities
+           str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
+           str_detect(iati_identifier, "1-204584") |   # Policy Research Fund (FCDO)  
            str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
            str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
            str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
@@ -499,7 +502,7 @@ wellcome_grants_final <- wellcome_grants_comb %>%
 # 5) FCDO spreadsheet data
 
 # Detect all Excel files in Data folder
-path = "C:\\Users\\e-clegg\\OneDrive - DFID\\PROJECT - MODARI\\2. Awards\\IATI\\External partner data\\Completed returns"
+path = "C:\\Users\\e-clegg\\OneDrive - DFID\\PROJECT - MODARI\\2. Awards\\IATI\\External partner data\\2 - Completed returns"
 file_list <- list.files(path = path, pattern='*.xlsx', full.names = TRUE)
 
 # Read all files into R (skipping first 28 lines in Excel sheet as this contains no data)
@@ -534,10 +537,11 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          status = if_else(end_date >= Sys.Date(), "Active", "Closed")
          ) %>% 
   select(-`No.`, -`Funder programme - name`, -Notes, -file_number, -Currency,
-         -`Aims/Objectives`, -`Investigator(s) - name`)
+         -`Aims/Objectives`, -`Investigator(s) - name`, -`FCDO programme - name`,
+         -`FCDO programme - IATI ID`)
 
 
-# 6) Join 4 sources together ----------------------------------------------
+# 6) Join 5 sources together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
@@ -546,12 +550,18 @@ all_projects <- rbind(ukri_projects_final, nihr_projects_final,
 
 # Change terminology around award status
 all_projects <- all_projects %>% 
-  mutate(status = if_else(status %in% c("Contracted", "Implementation"), "Active", status))
+  mutate(status = if_else(status %in% c("Contracted", "Implementation"), "Active", status)) %>% 
+  unique()
 
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
 # all_projects <- readRDS("Outputs/all_projects.rds") 
 
 
+# 7) CHECKING ----
+test1 <- filter(all_projects, str_detect(extending_org, "Elrha"))
+test2 <- filter(all_projects, str_detect(extending_org, "Abdul"))
+
+test <- filter(all_projects, str_detect(id, "US-EIN-042103594-GCCI-3978870"))
 
 
