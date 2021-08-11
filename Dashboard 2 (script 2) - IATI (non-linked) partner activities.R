@@ -80,7 +80,8 @@ org_code <- c(
               "XM-DAC-928",   # WHO
               "DAC-1601",     # Bill & Melinda Gates Foundation
               "GB-CHC-222655", # Liverpool School of Tropical Medicine
-              "XI-IATI-AGR"    # AgResults (Consortium)
+              "XI-IATI-AGR",    # AgResults (Consortium)
+              "US-EIN-37-1552838" # GSMA Foundation
               )   
 
 # 1) Activity extract

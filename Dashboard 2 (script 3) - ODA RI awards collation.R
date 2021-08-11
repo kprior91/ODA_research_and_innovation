@@ -357,7 +357,7 @@ nihr_projects_final <- nihr_projects %>%
          Funder = "Department of Health and Social Care",
          Fund = "Global Health Research - Programmes",
          recipient_country = "",
-         lead_org_country = ctry17nm,
+         lead_org_country = ctrynm,
          iati_id = "",
          subject = programme,
          currency = "GBP",
@@ -543,7 +543,7 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          ) %>% 
   select(-`No.`, -`Funder programme - name`, -Notes, -file_number, -Currency,
          -`Aims/Objectives`, -`Investigator(s) - name`, -`FCDO programme - name`,
-         -`FCDO programme - IATI ID`)
+         -`FCDO programme - IATI ID`, -Link)
 
 
 # 6) Join 5 sources together ----------------------------------------------
