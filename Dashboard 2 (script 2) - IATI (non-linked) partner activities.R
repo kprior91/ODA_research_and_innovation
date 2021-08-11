@@ -472,3 +472,4 @@ table(activity_list$currency)
 # Check specific partner
 test1 <- filter(activity_list, str_detect(reporting_org, "Elrha"))
 test2 <- filter(activity_list, str_detect(reporting_org, "Abdul"))
+

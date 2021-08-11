@@ -26,7 +26,7 @@ library(writexl)
 # Function to extract 5-digit sector codes
 
 sector_extract <- function(page) {
-  path <- paste0("https://iatidatastore.iatistandard.org/api/sectors/?fields=category,url,name,code&format=json&page_size=20&page=", page)
+  path <- paste0("https://iati.cloud/api/sectors/?fields=category,url,name,code&format=json&page_size=20&page=", page)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
@@ -66,7 +66,7 @@ sector_list_research <- sector_list_final %>%
 # Function to extract all UK government reporters
 
 # gov_reporters <- function(page) {
-#   path <- paste0("https://iatidatastore.iatistandard.org/api/publishers/?q=GB-GOV&q_fields=reporting_org_identifier?format=json&page_size=20&page=", page)
+#   path <- paste0("https://iati.cloud/api/publishers/?q=GB-GOV&q_fields=reporting_org_identifier?format=json&page_size=20&page=", page)
 #   request <- GET(url = path)
 #   response <- content(request, as = "text", encoding = "UTF-8")
 #   response <- fromJSON(response, flatten = TRUE) 
@@ -104,7 +104,7 @@ organisation_codes <- c("GB-GOV-1", "GB-GOV-7", "GB-GOV-10", "GB-GOV-13", "GB-GO
 
 # Function to extract all UK government department activities
 uk_gov_extract <- function(page, org_code) {
-  path <- paste0("https://iatidatastore.iatistandard.org/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
+  path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 

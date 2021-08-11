@@ -126,6 +126,9 @@ for (fund in c("GCRF", "Newton")) {
   }
 }
 
+saveRDS(ukri_projects_by_fund, file = "Outputs/ukri_projects_by_fund.rds")
+# ukri_projects_by_fund <- readRDS("Outputs/ukri_projects_by_fund.rds") 
+
 # Extract GTR ID from extract
 ukri_projects_by_fund_with_id <- ukri_projects_by_fund %>% 
   unnest(cols = identifiers.identifier) %>% 
@@ -195,7 +198,8 @@ extract_ukri_projects_by_id <- function(id) {
           select(country) %>% 
           unique() %>% 
           summarise(partner_country = paste(country[!is.na(country)], collapse = ", "))
-      
+      }
+        
       org_roles_summarised <- cbind(org_names, org_countries)
       
     }
@@ -245,7 +249,6 @@ extract_ukri_projects_by_id <- function(id) {
       select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
              lead_org_name, lead_org_country, partner_org_name, partner_org_country) 
     
-    
     return(project_data)
   }
   
@@ -265,6 +268,8 @@ for (id in ukri_projects_ids$`GtR ID`) {
   
 }
 
+saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
+# ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
 
 ### D 
 # Join to fund and funder info from original list
@@ -562,6 +567,6 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 test1 <- filter(all_projects, str_detect(extending_org, "Elrha"))
 test2 <- filter(all_projects, str_detect(extending_org, "Abdul"))
 
-test <- filter(all_projects, str_detect(id, "US-EIN-042103594-GCCI-3978870"))
+test <- filter(all_projects, str_detect(id, "MR/N006267/1"))
 
 

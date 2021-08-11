@@ -125,5 +125,7 @@ saveRDS(all_projects_transactions, file = "Outputs/all_projects_transactions.rds
 
 test <- filter(all_projects_transactions, str_detect(extending_org, "Abdul"))
 
+test <- filter(all_projects_transactions, str_detect(id, "MR/N006267/1"))
+
 # check id field is unique
 length(unique(all_projects_transactions$id))

@@ -235,10 +235,11 @@ test <- filter(all_projects, extending_org == "Global Disability Innovation Hub"
 
 test2 <- filter(all_projects_final, extending_org == "Institute of Development Studies")
 
-test <- filter(all_projects_tidied, str_detect(fcdo_programme_id, "300211"))
+test <- filter(all_projects_tidied, str_detect(fcdo_programme_id, "202766"))
 
+test <- filter(all_projects_transactions, str_detect(iati_id, "202766"))
 
-
+test <- filter(all_projects_tidied, str_detect(id, "MR/N006267/1"))
 
 
 
