@@ -54,6 +54,7 @@ component_extract <- function(activity_id) {
 
 }
 
+id <- "GB-GOV-1-300124-102"
 
 for (id in red_programmes$red_iati_id) {
   

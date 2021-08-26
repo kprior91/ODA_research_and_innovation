@@ -9,74 +9,42 @@ if (!("googlesheets4" %in% installed.packages())) {
 if (!("gargle" %in% installed.packages())) {
   install.packages("gargle")
 }
-if (!("geonames" %in% installed.packages())) {
-  install.packages("geonames")
-}
-if (!("RgoogleMaps" %in% installed.packages())) {
-  install.packages("RgoogleMaps")
-}
-if (!("rworldmap" %in% installed.packages())) {
-  install.packages("rworldmap")
-}
-if (!("ggmap" %in% installed.packages())) {
-  install.packages("ggmap")
-}
 if (!("jsonlite" %in% installed.packages())) {
   install.packages("jsonlite")
-}
-if (!("rvest" %in% installed.packages())) {
-  install.packages("rvest")
-}
-if (!("stringi" %in% installed.packages())) {
-  install.packages("stringi")
 }
 if (!("tidyverse" %in% installed.packages())) {
   install.packages("tidyverse")
 }
-if (!("readxl" %in% installed.packages())) {
-  install.packages("readxl")
-}
-if (!("writexl" %in% installed.packages())) {
-  install.packages("writexl")
-}
 
 # Load packages -----
-library(geonames) 
-library(RgoogleMaps)
-library(rworldmap)
-library(ggmap)
 library(jsonlite)
-library(rvest)
-library(stringi)
+#library(stringi)
 library(googlesheets4)
 library(gargle)
-library(httr)
+#library(httr)
 library(tidyverse)
-library(writexl)
-library(readxl)
+
 
 # Read in data from script 4
 all_projects_transactions <- readRDS(file = "Outputs/all_projects_transactions.rds")
 
 # 1) Extract countries -----------------------------------
 
-# Add the country mentioned field onto main dataset
+# Distinguish location and beneficiary countries in main dataset
 all_projects_final <- all_projects_transactions %>% 
   mutate(location_country = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, "")),
          beneficiary_country = recipient_country)
 
-# Convert location vs. recipient country data to long format
+# Convert location vs. beneficiary country data to long format
 countries_data <- all_projects_final %>% 
   select(id, beneficiary_country, location_country) %>%
   gather(key = "country_type", value = "Country", -id) %>% 
-  right_join(select(all_projects_final, -beneficiary_country, -location_country), by = "id") %>% 
-  mutate(Country = str_replace_all(Country, "NA", "Unknown"),
-         Country = str_replace_all(Country, ",,", ","))
+  right_join(select(all_projects_final, -beneficiary_country, -location_country), by = "id")
 
 # Create one row per country
 all_projects_split_country <- countries_data %>%
   select(id, extending_org, country_type, Country) %>% 
-  mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of,|Tanzania, United Republic of,", "Tanzania,")) %>%
+  mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of|Tanzania, United Republic of", "Tanzania")) %>%
   mutate(Country = str_replace_all(Country, ";", ",")) %>%
   mutate(Country = gsub("\\s*\\([^\\)]+\\)","", as.character(Country))) %>%
   separate_rows(Country, sep = ",", convert = FALSE) %>%
@@ -89,8 +57,25 @@ all_projects_split_country <- countries_data %>%
          Country = if_else(str_detect(Country, "Ivoire"), "Ivory Coast", Country),
          Country = str_replace(Country, "Republic of Congo", "Congo Republic"),
          Country = str_replace(Country, "DRC", "Democratic Republic of the Congo"),
-         Country = if_else(str_detect(Country, "Hong Kong"), "Hong Kong", Country),
-         Country = str_replace_all(Country, "é", "e")) %>% 
+         Country = if_else(str_detect(Country, "Hong Kong"), "Hong Kong", Country)) %>% 
+  unique() %>% 
+  filter(!(Country %in% c("", "NA", "Unknown")) & !is.na(Country)) %>% 
+  arrange(id)
+
+
+# Create one row per country
+all_projects_split_country <- countries_data %>%
+  select(id, extending_org, country_type, Country) %>% 
+  mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of|Tanzania, United Republic of", "Tanzania"),
+         Country = str_replace_all(Country, "Congo, Democratic Republic of", "Democratic Republic of the Congo")) %>%
+  mutate(Country = gsub("\\s*\\([^\\)]+\\)","", as.character(Country))) %>%
+  separate_rows(Country, sep = ",|;|/", convert = FALSE) %>%
+  mutate(Country = str_trim(Country),
+         Country = if_else(str_detect(tolower(Country), "uk|united kingdom|england|northern ireland|wales|scotland"), "United Kingdom", Country),
+         Country = if_else(str_detect(tolower(Country), "usa|united states"), "United States", Country),
+         Country = if_else(str_detect(tolower(Country), "netherlands"), "Netherlands", Country),
+         Country = if_else(str_detect(tolower(Country), "philippines"), "Philippines", Country),
+         Country = if_else(str_detect(tolower(Country), "ivoire"), "Ivory Coast", Country)) %>% 
   unique() %>% 
   filter(!(Country %in% c("", "NA", "Unknown")) & !is.na(Country)) %>% 
   arrange(id)
@@ -110,15 +95,12 @@ all_projects_split_country <- all_projects_split_country %>%
   mutate(Country = if_else(Country %in% dac_lookup$country_name, Country, "Unknown")) %>% 
   unique()
 
-
 # Join countries to project data
 all_projects_final <- countries_data %>% 
   # remove commas at start
   mutate(Country = if_else(substr(Country, 1, 1) == ",", substr(Country, 2, length(Country)-1), Country)) %>% 
   rename(all_countries = Country) %>% 
-  left_join(all_projects_split_country, by = c("id", "extending_org", "country_type")) %>% 
-  mutate(date_refreshed = Sys.Date())
-
+  left_join(all_projects_split_country, by = c("id", "extending_org", "country_type")) 
 
 # Add row ID field to dataset
 all_projects_final$row_id <- seq.int(nrow(all_projects_final))
@@ -140,7 +122,7 @@ duplicate_country_projects <- filter(all_projects_final,
   unique() %>% 
   filter(id %in% missing_country_projects$id) 
 
-# Exclude project records with unknown/missing abstract or beneficiary country AND
+# Exclude project records with unknown/missing location or beneficiary country AND
 # a populated other country record
 all_projects_tidied <- all_projects_final %>% 
   left_join(missing_country_projects, by = c("row_id", "id", "country_type")) %>% 
@@ -161,11 +143,72 @@ all_projects_tidied <- all_projects_tidied %>%
   mutate(fcdo_programme_id = sub("-.*", "", fcdo_programme_id))
 
 
-# 3) Check data -----------------------------------
+
+# 3) Add funder programme names ------------------
+
+# Create vector of FCDO gov funder programme IATI IDs
+gov_funder_iati_ids <- all_projects_tidied %>% 
+  select(iati_id) %>% 
+  filter(str_detect(iati_id, "GB-1-|GB-GOV-1-")) %>% 
+  unique()
+
+# Function to extract programme names from IATI
+
+extract_iati_activity_name <- function(activity_id) {
+  
+  path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=title")
+  request <- GET(url = path)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  new_data <- response$results 
+  
+  if(length(new_data) > 0) {
+    new_data <- new_data %>% 
+      unnest(col = title.narrative) %>% 
+      select(funder_iati_id = iati_identifier, funder_programme = text)
+  } else {
+    new_data <- data.frame()
+  }
+  
+  return(new_data)
+  
+}
+
+# Create empty dataframe to hold name extract from IATI
+gov_funder_programme_names <- data.frame()
+
+# Run function over all IATI ids
+
+for (id in gov_funder_iati_ids$iati_id) {
+  
+  print(id)
+  data <- extract_iati_activity_name(id)
+  
+  gov_funder_programme_names <- rbind(gov_funder_programme_names, data)
+  
+}
+
+
+# Join funder programme name to main dataset
+all_projects_tidied <- all_projects_tidied %>%
+  left_join(gov_funder_programme_names, by = c("iati_id" = "funder_iati_id")) 
+
+
+# 4) Check data -----------------------------------
 
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO fully funded", Fund),
-         Funder = if_else(Funder == "Foreign, Commonwealth & Development Office", "Foreign, Commonwealth and Development Office", Funder)) 
+         Funder = if_else(str_detect(Funder, "Foreign, Commonwealth & Development Office|FCDO"), "Foreign, Commonwealth and Development Office", Funder)) 
+
+all_projects_tidied <- all_projects_tidied %>% 
+  mutate(Funder = if_else(Funder == "National Institutes of Health", "Department of Health and Social Care", Funder),
+         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country))
+
+# TEMPORARY ***
+# Remove IDRC DHSC IATI data
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"))
+
 
 # check list of ODA R&I funds
 unique(all_projects_tidied$Fund)
@@ -178,12 +221,6 @@ nrow(test)
 unique(all_projects_tidied$Funder)
 test <- filter(all_projects_tidied, is.na(Funder))
 
-# Look at data from a particular delivery partner
-test <- filter(all_projects_tidied, extending_org == "Bill & Melinda Gates Foundation")
-
-# Look for a particular award (from keyword in title)
-test <- filter(all_projects_tidied, str_detect(title, "under-five"))
-
 # Check countries
 unique(all_projects_tidied$Country)
 
@@ -193,17 +230,12 @@ test <- filter(all_projects_tidied,
 test2 <- filter(all_projects_tidied, 
                 Country == "Unknown")
 
-
 test3 <- filter(all_projects_tidied, 
                 Country == "Niger")
 
 # Unknown country should be for the activity location only
 unique(test2$country_type)
 
-# TEMPORARY ***
-# Remove IDRC DHSC IATI data
-all_projects_tidied <- all_projects_tidied %>% 
-  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"))
 
 # 4) Write data --------------------------------
 
@@ -213,9 +245,15 @@ saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
 
 # Limit size and number of columns for writing
 all_projects_tidied <- all_projects_tidied %>% 
- # select(-subject, -all_countries, -date_refreshed) %>% 
+ # select(-subject, -all_countries, -last_updated) %>% 
   mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2)) %>% 
   unique()
+
+
+# Remove Afghanistan projects
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(Country != "Afghanistan")
+  
 
 # Write data to EC google drive 
 # Authorise googlesheets4 to view and manage sheets on EC Drive
@@ -231,7 +269,10 @@ results_sheet <- sheet_write(all_projects_tidied,
 
 
 # 5) Testing ---------------------------------------
-test <- filter(all_projects, extending_org == "Global Disability Innovation Hub")
+
+unique(all_projects_tidied$Funder)
+
+test <- filter(all_projects, extending_org == "GSMA Foundation")
 
 test2 <- filter(all_projects_final, extending_org == "Institute of Development Studies")
 
@@ -241,6 +282,11 @@ test <- filter(all_projects_transactions, str_detect(iati_id, "202766"))
 
 test <- filter(all_projects_tidied, str_detect(id, "MR/N006267/1"))
 
+# Look at data from a particular delivery partner
+test <- filter(all_projects_tidied, extending_org == "Bill & Melinda Gates Foundation")
+
+# Look for a particular award (from keyword in title)
+test <- filter(all_projects_tidied, str_detect(title, "under-five"))
 
 
 

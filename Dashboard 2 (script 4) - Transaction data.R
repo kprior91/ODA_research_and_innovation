@@ -3,6 +3,9 @@
 # Extract transactions for activities covering multiple awards
 #####################################
 
+# Set quarter end date for IATI information
+quarter_end_date <- as.Date("2021-06-30")
+
 # A) Extraction ----
 # Manually specify the IATI activities to extract transactions for
 
@@ -89,7 +92,8 @@ transactions_unnest <- transaction_list %>%
   mutate(partner_org_name = "",
          partner_org_country = "",
          lead_org_country = "",
-         end_date = "")
+         end_date = "",
+         last_updated = quarter_end_date)
 
 
 # C) Join information back to master dataset ----

@@ -46,19 +46,20 @@ if (!("writexl" %in% installed.packages())) {
 }
 
 # Load packages -----
-library(geonames) 
-library(RgoogleMaps)
-library(rworldmap)
-library(ggmap)
+#library(geonames) 
+#library(RgoogleMaps)
+#library(rworldmap)
+#library(ggmap)
 library(jsonlite)
-library(rvest)
-library(stringi)
-library(googlesheets4)
-library(gargle)
-library(httr)
+#library(rvest)
+#library(stringi)
+#library(httr)
 library(tidyverse)
-library(writexl)
 library(readxl)
+
+# Set quarter end date
+quarter_end_date <- as.Date("2021-06-30")
+
 
 # -- Read in GRID data
 # Match institutions to countries with GRID database
@@ -142,6 +143,7 @@ ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>%
 
 
 ### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
+### TO UPDATE ###
 
 # Read in other ODA UKRI projects
 ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
@@ -152,13 +154,22 @@ ukri_projects_ids <- ukri_projects_ids %>%
 
 ### c - Extract project info from GtR API ###
 
+# test: id <- "MR/K006533/1"
+
 extract_ukri_projects_by_id <- function(id) {
   
   path <- paste0("http://gtr.ukri.org/projects?ref=", id)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
+  
+  # extract project data and last refresh date
   data <- response$projectOverview
+  
+  last_updated <- (response$lastRefreshDate)$lastRefreshDate %>% 
+    str_replace_all("Data last updated:  ", "") %>% 
+    as.Date(format = "%d %b %Y")
+
   
   if(length(data) > 0) {
     
@@ -211,7 +222,8 @@ extract_ukri_projects_by_id <- function(id) {
       gtr_id = projects[["grantReference"]],
       fund = projects[["fund"]],
       abstract = projects[["abstractText"]],
-      lead_org_name = lead_org[["name"]])
+      lead_org_name = lead_org[["name"]],
+      last_updated = as.Date(last_updated))
     
     # Unnest if a lead org address is given
     if(length(lead_org[["address"]]) > 0) {
@@ -247,7 +259,7 @@ extract_ukri_projects_by_id <- function(id) {
     # Keep desired fields
     project_data <- project_data %>% 
       select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
-             lead_org_name, lead_org_country, partner_org_name, partner_org_country) 
+             lead_org_name, lead_org_country, partner_org_name, partner_org_country, last_updated) 
     
     return(project_data)
   }
@@ -298,7 +310,8 @@ ukri_projects_final <- ukri_projects_final %>%
          currency = "GBP",
          status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed"),
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
-                        if_else(Fund == "Newton", "Newton Fund", Fund))) %>% 
+                        if_else(Fund == "Newton", "Newton Fund", Fund)),
+         last_updated = as.Date(last_updated)) %>% 
   select(id,
          title, 
          abstract,
@@ -316,7 +329,8 @@ ukri_projects_final <- ukri_projects_final %>%
          Funder, 
          recipient_country,
          subject,
-         status) %>% 
+         status,
+         last_updated) %>% 
   unique()
 
 # Add GtR link to projects
@@ -346,7 +360,7 @@ nihr_projects <- response$records
 
 # Remove unneeded columns
 nihr_projects <- nihr_projects %>% 
-  select(-1, -2, -3) 
+  select(-1, -2) 
 
 # Remove "field." from column names
 names(nihr_projects) <- gsub(pattern = "fields.", replacement = "", x = names(nihr_projects))
@@ -363,7 +377,8 @@ nihr_projects_final <- nihr_projects %>%
          currency = "GBP",
          partner_org_name = "",
          partner_org_country = "",
-         extending_org = "NIHR") %>% 
+         extending_org = "NIHR",
+         last_updated = as.Date(record_timestamp)) %>% 
   select(id, 
          title = project_title,
          abstract = scientific_abstract,
@@ -379,7 +394,8 @@ nihr_projects_final <- nihr_projects %>%
          Funder,
          recipient_country,
          subject,
-         status = project_status)
+         status = project_status,
+         last_updated)
 
 # Add NIHR link to awards
 nihr_projects_final <- nihr_projects_final %>% 
@@ -416,7 +432,8 @@ iati_projects_final <- iati_projects %>%
          lead_org_country = "",
          partner_org_name = "",
          partner_org_country = "",
-         extending_org = coalesce(extending_org, reporting_org)) %>% 
+         extending_org = coalesce(extending_org, reporting_org),
+         last_updated = quarter_end_date) %>% 
   select(id = iati_identifier,
          title = activity_title, 
          abstract = activity_description,
@@ -434,7 +451,8 @@ iati_projects_final <- iati_projects %>%
          Funder, 
          recipient_country = all_countries,
          subject = sector_name,
-         status = activity_status
+         status = activity_status,
+         last_updated
   ) 
 
 # Add IATI link to awards
@@ -449,7 +467,7 @@ rm(response)
 # 4) Extract Wellcome projects ------------------------------------------------
 
 # Read in public data on Wellcome Grants
-wellcome_grants <- read_excel("Inputs/wellcome-grants-awarded-2005-2020.xlsx")
+wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 
 # Read in partnerships data provided by Annie (Jan 21) - restrict to suspected ODA
 wellcome_partnerships <- read_excel("Inputs/Active Partnership record - 25 01 2021 (ODA labelled).xlsx") %>% 
@@ -472,7 +490,8 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          Funder = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"), 
                           "Department of Health and Social Care", `Partner Organisation(s)`),
          Fund = if_else(Funder == "Department of Health and Social Care",
-                        "Global Health Research - Partnerships", "FCDO partially funded")) 
+                        "Global Health Research - Partnerships", "FCDO partially funded"),
+         last_updated = quarter_end_date) 
 
 # Select desired variables
 wellcome_grants_comb <- wellcome_grants_comb %>% 
@@ -488,12 +507,13 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          lead_org_country = `Recipient Org:Country`,
          partner_org_name,
          partner_org_country,
-         iati_id = `Partnership Name`,
+         iati_id = `Partnership Name.x`,
          Fund,
          Funder, 
          recipient_country,
          subject = `Master Grant Type Name`,
-         status
+         status,
+         last_updated
   ) 
 
 # Format date fields for merging
@@ -539,7 +559,8 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          end_date = as.character(end_date),
          currency = coalesce(Currency, "GDP"),
          subject = "",
-         status = if_else(end_date >= Sys.Date(), "Active", "Closed")
+         status = if_else(end_date >= Sys.Date(), "Active", "Closed"),
+         last_updated = quarter_end_date
          ) %>% 
   select(-`No.`, -`Funder programme - name`, -Notes, -file_number, -Currency,
          -`Aims/Objectives`, -`Investigator(s) - name`, -`FCDO programme - name`,

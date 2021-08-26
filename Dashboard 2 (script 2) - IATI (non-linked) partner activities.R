@@ -79,9 +79,7 @@ org_code <- c(
               "XI-IATI-CABI", # CABI
               "XM-DAC-928",   # WHO
               "DAC-1601",     # Bill & Melinda Gates Foundation
-              "GB-CHC-222655", # Liverpool School of Tropical Medicine
               "XI-IATI-AGR",    # AgResults (Consortium)
-              "US-EIN-37-1552838" # GSMA Foundation
               )   
 
 # 1) Activity extract
@@ -395,10 +393,8 @@ activity_list_unnest_9 <- partner_activity_comb %>%
          date_type = type.name) %>%
   unique() %>% 
   spread(key = date_type, value = date) %>% 
-  mutate(start_date = `Actual start`,
-         end_date = `Planned End`) %>% 
-  # mutate(start_date = coalesce(`Actual start`, `Planned start`),
-  #        end_date = coalesce(`Actual end`, `Planned End`)) %>% 
+  mutate(start_date = coalesce(`Actual start`, `Planned start`),
+         end_date = coalesce(`Actual end`, `Planned End`)) %>% 
   select(iati_identifier, start_date, end_date)
 
 
@@ -471,6 +467,6 @@ table(activity_list$gov_funder)
 table(activity_list$currency)
 
 # Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "Elrha"))
+test1 <- filter(activity_list, str_detect(reporting_org, "AgResults"))
 test2 <- filter(activity_list, str_detect(reporting_org, "Abdul"))
 
