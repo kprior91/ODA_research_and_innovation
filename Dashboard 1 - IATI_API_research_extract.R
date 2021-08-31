@@ -116,12 +116,22 @@ saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final.rds")
 # 3) Restrict to ODA R&I activities -----------
 # (eventually via the R&I "tag" field)
 
-# Unnest research and innovation tag
+# Unnest tags
 uk_gov_ri_programmes <- uk_gov_list_final %>% 
   unnest(col = tag,
          keep_empty = TRUE) %>% 
   select(-narrative, -vocabulary_uri, -vocabulary.code, -vocabulary.name)
-  
+
+# Save list of tagged research & innovation programmes
+fcdo_ri_programmes <- uk_gov_ri_programmes %>% 
+  filter(code == "RI") %>% 
+  select(iati_identifier) %>% 
+  unique()
+
+saveRDS(fcdo_ri_programmes, file = "Outputs/fcdo_ri_programmes.rds")
+# Restore the object
+# fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
+
 # RED_programmes <- read_excel("Inputs/RED programme IDs.xlsx") %>% 
 #   mutate(red_iati_id_1 = paste0("GB-1-", ProjectID),
 #          red_iati_id_2 = paste0("GB-GOV-1-", ProjectID))
@@ -374,7 +384,7 @@ gov_list <- gov_list %>%
          country_name, country_percentage, sector_code, sector_name,
          policy_marker_code, policy_marker_name, policy_significance, climate_focus,
          sector_percentage, partner, partner_role, partner_ref, partner_country, extending_org,
-         amount , currency) %>% 
+         amount, period_start, period_end, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date())
 
@@ -468,4 +478,6 @@ saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 
 # Save to Excel
 write_xlsx(x = list(`IATI research` = gov_list_final), 
-           path = "Outputs/IATI research activities.xlsx")
+           path = "IATI research activities.xlsx")
+
+

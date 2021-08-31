@@ -53,7 +53,7 @@ if (!("writexl" %in% installed.packages())) {
 library(jsonlite)
 #library(rvest)
 #library(stringi)
-#library(httr)
+library(httr)
 library(tidyverse)
 library(readxl)
 
@@ -307,6 +307,8 @@ ukri_projects_final <- ukri_projects_final %>%
   mutate(recipient_country = "",
          subject = "",
          amount = as.numeric(amount),
+         period_start = "",
+         period_end = "",
          currency = "GBP",
          status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed"),
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
@@ -318,6 +320,8 @@ ukri_projects_final <- ukri_projects_final %>%
          start_date,
          end_date,
          amount,
+         period_start,
+         period_end,
          currency,
          extending_org,
          lead_org_name,
@@ -375,6 +379,8 @@ nihr_projects_final <- nihr_projects %>%
          iati_id = "",
          subject = programme,
          currency = "GBP",
+         period_start = "",
+         period_end = "",
          partner_org_name = "",
          partner_org_country = "",
          extending_org = "NIHR",
@@ -384,6 +390,8 @@ nihr_projects_final <- nihr_projects %>%
          abstract = scientific_abstract,
          start_date, end_date,
          amount = award_amount_from_dh,
+         period_start,
+         period_end,
          currency,
          extending_org,
          lead_org_name = contracted_organisation, 
@@ -440,6 +448,8 @@ iati_projects_final <- iati_projects %>%
          start_date,
          end_date,
          amount,
+         period_start,
+         period_end,
          currency,
          extending_org,
          lead_org_name = partner,
@@ -487,6 +497,8 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          partner_org_name = "",
          partner_org_country = `Research Location Countries`,
          recipient_country = "",
+         period_start = "",
+         period_end = "",
          Funder = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"), 
                           "Department of Health and Social Care", `Partner Organisation(s)`),
          Fund = if_else(Funder == "Department of Health and Social Care",
@@ -501,6 +513,8 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          start_date = `Planned Dates:Start Date`,
          end_date = `Planned Dates:End Date`,
          amount = `Amount Awarded`,
+         period_start,
+         period_end,
          currency,
          extending_org,
          lead_org_name = `Recipient Org:Name`,
@@ -558,6 +572,8 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
   mutate(start_date = as.character(start_date),
          end_date = as.character(end_date),
          currency = coalesce(Currency, "GDP"),
+         period_start = "",
+         period_end = "",
          subject = "",
          status = if_else(end_date >= Sys.Date(), "Active", "Closed"),
          last_updated = quarter_end_date
@@ -585,7 +601,7 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 
 
 # 7) CHECKING ----
-test1 <- filter(all_projects, str_detect(extending_org, "Elrha"))
+test1 <- filter(all_projects, str_detect(extending_org, "Liverpool"))
 test2 <- filter(all_projects, str_detect(extending_org, "Abdul"))
 
 test <- filter(all_projects, str_detect(id, "MR/N006267/1"))

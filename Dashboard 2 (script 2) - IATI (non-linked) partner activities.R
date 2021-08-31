@@ -378,10 +378,30 @@ activity_list_unnest_7 <- partner_activity_comb %>%
   select(iati_identifier, 
          budget_status = status.name, 
          amount = value.value, 
-         currency = value.currency.code) %>% 
+         currency = value.currency.code,
+         period_start,
+         period_end) %>% 
+  # take first record for activities with multiple budgets for the same period
+  group_by(iati_identifier, budget_status, currency, period_start, period_end) %>% 
+  slice(1) %>% 
+  # remove unpopulated budget status records
+  filter(!is.na(budget_status)) %>% 
+  ungroup()
+
+# Find activities with multiple budgets
+multiple_budgets <- activity_list_unnest_7 %>% 
+  group_by(iati_identifier, period_start, period_end) %>% 
+  summarise(count = n()) %>% 
+  filter (count > 1)
+
+# Keep only the committed budget in these cases
+activity_list_unnest_7_dedup <- activity_list_unnest_7 %>% 
+  filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
+           budget_status == "Committed") %>% 
   group_by(iati_identifier, budget_status, currency) %>% 
-  summarise(amount = sum(amount), 0) %>% 
-  filter(!is.na(budget_status))
+  summarise(period_start = min(period_start),
+            period_end = max(period_end),
+            amount = sum(amount))
 
 
 # 8) Unlist start/end dates
@@ -391,7 +411,9 @@ activity_list_unnest_9 <- partner_activity_comb %>%
   select(iati_identifier, 
          date = iso_date,
          date_type = type.name) %>%
-  unique() %>% 
+  # take the first date in cases of two of the same time
+  group_by(iati_identifier, date_type) %>%
+  slice(1) %>%
   spread(key = date_type, value = date) %>% 
   mutate(start_date = coalesce(`Actual start`, `Planned start`),
          end_date = coalesce(`Actual end`, `Planned End`)) %>% 
@@ -406,7 +428,7 @@ activity_list <- activity_list_base %>%
   left_join(activity_list_unnest_4, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_5, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_6, by = "iati_identifier") %>% 
-  left_join(activity_list_unnest_7, by = "iati_identifier") %>% 
+  left_join(activity_list_unnest_7_dedup, by = "iati_identifier") %>% 
   #left_join(activity_list_unnest_8, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_9, by = "iati_identifier") 
 
@@ -425,7 +447,7 @@ activity_list <- activity_list %>%
         # policy_marker_code, policy_marker_name, policy_significance, climate_focus,
          partner, partner_role, partner_ref, partner_country, gov_funder, 
          extending_org, fund,
-         budget_status, amount, currency) %>% 
+         budget_status, amount, period_start, period_end, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date())
 
@@ -467,6 +489,6 @@ table(activity_list$gov_funder)
 table(activity_list$currency)
 
 # Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "AgResults"))
+test1 <- filter(activity_list, str_detect(reporting_org, "Liverpool"))
 test2 <- filter(activity_list, str_detect(reporting_org, "Abdul"))
 

@@ -91,6 +91,8 @@ transactions_unnest <- transaction_list %>%
 
   mutate(partner_org_name = "",
          partner_org_country = "",
+         period_start = "",
+         period_end = "",
          lead_org_country = "",
          end_date = "",
          last_updated = quarter_end_date)
