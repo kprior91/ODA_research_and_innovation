@@ -13,7 +13,13 @@ if (!("jsonlite" %in% installed.packages())) {
   install.packages("jsonlite")
 }
 if (!("tidyverse" %in% installed.packages())) {
+  install.packages("httr")
+}
+if (!("tidyverse" %in% installed.packages())) {
   install.packages("tidyverse")
+}
+if (!("tidyverse" %in% installed.packages())) {
+  install.packages("readxl")
 }
 
 # Load packages -----
@@ -21,9 +27,9 @@ library(jsonlite)
 #library(stringi)
 library(googlesheets4)
 library(gargle)
-#library(httr)
+library(httr)
 library(tidyverse)
-
+library(readxl)
 
 # Read in data from script 4
 all_projects_transactions <- readRDS(file = "Outputs/all_projects_transactions.rds")
@@ -133,10 +139,18 @@ all_projects_tidied <- all_projects_tidied %>%
   mutate(Country = if_else(is.na(Country), "Unknown", Country)) %>% 
   select(-exclude_flag)
 
+all_projects_tidied <- all_projects_tidied %>% 
+  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO fully funded", Fund),
+         Funder = if_else(str_detect(Funder, "Foreign, Commonwealth & Development Office|FCDO"), "Foreign, Commonwealth and Development Office", Funder)) 
+
+all_projects_tidied <- all_projects_tidied %>% 
+  mutate(Funder = if_else(Funder == "National Institutes of Health", "Department of Health and Social Care", Funder),
+         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country))
+
 # Add FCDO programme ID
 all_projects_tidied <- all_projects_tidied %>% 
     # remove any text before "-1-" in the FCDO IATI ID
-  mutate(fcdo_programme_id = if_else(Funder == "Foreign, Commonwealth and Development Office"
+  mutate(fcdo_programme_id = if_else(Funder %in% c("Foreign, Commonwealth and Development Office", "FCDO")
                                      & str_detect(iati_id, "-1-"),
                                      sub(".*-1-", "", iati_id), "")) %>% 
     # remove any FCDO component numbers
@@ -196,14 +210,6 @@ all_projects_tidied <- all_projects_tidied %>%
 
 # 4) Check data -----------------------------------
 
-all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO fully funded", Fund),
-         Funder = if_else(str_detect(Funder, "Foreign, Commonwealth & Development Office|FCDO"), "Foreign, Commonwealth and Development Office", Funder)) 
-
-all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Funder = if_else(Funder == "National Institutes of Health", "Department of Health and Social Care", Funder),
-         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country))
-
 # TEMPORARY ***
 # Remove IDRC DHSC IATI data
 all_projects_tidied <- all_projects_tidied %>% 
@@ -246,9 +252,11 @@ saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
 # Limit size and number of columns for writing
 all_projects_tidied <- all_projects_tidied %>% 
  # select(-subject, -all_countries, -last_updated) %>% 
-  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2)) %>% 
-  unique()
-
+  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2),
+         status = if_else(is.na(status), "Unknown",
+                          if_else(status == "Complete", "Closed", status))) %>% 
+  unique() %>% 
+  filter(status != "Closed")
 
 # Remove Afghanistan projects
 all_projects_tidied <- all_projects_tidied %>% 

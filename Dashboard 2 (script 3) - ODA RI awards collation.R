@@ -60,7 +60,6 @@ library(readxl)
 # Set quarter end date
 quarter_end_date <- as.Date("2021-06-30")
 
-
 # -- Read in GRID data
 # Match institutions to countries with GRID database
 grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
@@ -431,8 +430,9 @@ iati_projects <- iati_activity_list %>%
            str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
   ) %>%    
   filter(flow_type == "ODA") %>% 
-  mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
-  plyr::rbind.fill(partner_iati_list) # Add partner activities
+  plyr::rbind.fill(partner_iati_list) %>%  # Add partner activities
+  mutate(fund = if_else(is.na(fund), "Unknown", fund),
+       status = if_else(as.Date(end_date) < Sys.Date(), "Closed", activity_status)) 
 
 # Keep required fields
 iati_projects_final <- iati_projects %>% 
@@ -461,7 +461,7 @@ iati_projects_final <- iati_projects %>%
          Funder, 
          recipient_country = all_countries,
          subject = sector_name,
-         status = activity_status,
+         status,
          last_updated
   ) 
 
