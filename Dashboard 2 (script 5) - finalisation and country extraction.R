@@ -145,7 +145,8 @@ all_projects_tidied <- all_projects_tidied %>%
 
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(Funder = if_else(Funder == "National Institutes of Health", "Department of Health and Social Care", Funder),
-         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country))
+         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
+         Country = if_else(Fund == "Chevening Scholarships" & country_type == 2, "United Kingdom", Country))
 
 # Add FCDO programme ID
 all_projects_tidied <- all_projects_tidied %>% 

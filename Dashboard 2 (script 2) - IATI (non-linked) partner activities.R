@@ -79,7 +79,7 @@ org_code <- c(
               "XI-IATI-CABI", # CABI
               "XM-DAC-928",   # WHO
               "DAC-1601",     # Bill & Melinda Gates Foundation
-              "XI-IATI-AGR",    # AgResults (Consortium)
+              "XI-IATI-AGR"    # AgResults (Consortium)
               )   
 
 # 1) Activity extract

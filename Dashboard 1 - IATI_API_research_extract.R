@@ -132,13 +132,6 @@ saveRDS(fcdo_ri_programmes, file = "Outputs/fcdo_ri_programmes.rds")
 # Restore the object
 # fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
 
-# RED_programmes <- read_excel("Inputs/RED programme IDs.xlsx") %>% 
-#   mutate(red_iati_id_1 = paste0("GB-1-", ProjectID),
-#          red_iati_id_2 = paste0("GB-GOV-1-", ProjectID))
-# 
-# RED_programme_codes <- c(RED_programmes$red_iati_id_1, RED_programmes$red_iati_id_2)
-# 
-# RED_programme_codes <- paste(RED_programme_codes, collapse="|")
 
 # Filter out non-research programmes  
 

@@ -46,22 +46,19 @@ if (!("writexl" %in% installed.packages())) {
 }
 
 # Load packages -----
-#library(geonames) 
-#library(RgoogleMaps)
-#library(rworldmap)
-#library(ggmap)
 library(jsonlite)
-#library(rvest)
-#library(stringi)
 library(httr)
 library(tidyverse)
 library(readxl)
 
+
+# 1) Set up -------------------------------------------
+
 # Set quarter end date
 quarter_end_date <- as.Date("2021-06-30")
 
-# -- Read in GRID data
-# Match institutions to countries with GRID database
+# Read in GRID data
+
 grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
   select(grid_id, name) %>% 
   unique()  %>% 
@@ -75,11 +72,12 @@ grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>%
 grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
 
 
-# 1) Extract UKRI projects -------------------------------------------
 
-### A - GCRF/Newton IDs ###
+# 2) Extract UKRI projects -------------------------------------------
 
-# Define function to extract projects by fund name (GCRF/Newton)
+### A - Define UKRI API functions ###
+
+# 1 - Function to extract project IDs by fund name (GCRF/Newton)
 extract_ukri_projects_by_fund <- function(page, fund) {
   
   path <- paste0("https://gtr.ukri.org:443/gtr/api/projects?q=",
@@ -88,8 +86,65 @@ extract_ukri_projects_by_fund <- function(page, fund) {
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
   projects <- response$project
+  
   return(projects)
 }
+
+
+# 2 - Function to extract staff organisation
+# person_id <- "6E394347-A44B-4868-8EC3-06CA4D034BDA"
+
+extract_staff_org <- function(staff_data, person_id) {
+  
+  path <- paste0("http://gtr.ukri.org/person/", person_id)
+  request <- GET(url = path)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  
+  person_current_org_name <- ((response$personOverview)$organisation)$name
+  person_current_org_id <- ((response$personOverview)$organisation)$id
+  
+  staff_org_data <- rbind(staff_data, data.frame(person_id, 
+                                                     person_current_org_name,
+                                                     person_current_org_id))
+  return(staff_org_data)
+}
+
+
+# 3 - Function to extract country from organisation ID
+# (checking GRID database as well as UKRI)
+# org_id <- "3ED60B49-9C2B-4D71-B644-96CCC7F10194"
+
+extract_org_country <- function(org_id) {
+  
+  path <- paste0("http://gtr.ukri.org/organisation/", org_id)
+  request <- GET(url = path)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  
+  # Look up country from UKRI GtR 
+  org_address <- ((response$organisationOverview)$organisation)$address
+  
+    if("country" %in% names(org_address)) {
+      org_country_ukri <- org_address$country
+      
+    } else {
+      org_country_ukri <- "Unknown"
+    }
+  
+  # Look up country from GRID database
+  grid_org_search <- data.frame(name = ((response$organisationOverview)$organisation)$name) %>% 
+    left_join(grid_institutes, by = "name") %>% 
+    left_join(grid_addresses, by = "grid_id")
+  
+  # Use GRID country over UKRI GtR one
+  org_country <- coalesce(grid_org_search$country, org_country_ukri)
+  
+  return(org_country)
+}
+
+
+### B - Extract GCRF/Newton project IDs ###
 
 # Create empty dataset to hold projects
 ukri_projects_by_fund <- data.frame()
@@ -137,11 +192,11 @@ ukri_projects_by_fund_with_id <- ukri_projects_by_fund %>%
 
 # Format data to join to other GtR ODA projects
 ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>% 
-  mutate(`IATI ID` = "", Stage = "", Funder = "Department for Business, Energy and Industrial Strategy") %>% 
-  select(`IATI ID`, Fund, Funder, extending_org = leadFunder, Stage, `GtR ID`, `Project Title` = title)
+  mutate(`Funder IATI ID` = "", Funder = "Department for Business, Energy and Industrial Strategy") %>% 
+  select(`Funder IATI ID`, Fund, Funder, `Extending Org` = leadFunder, `GtR ID`)
 
 
-### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
+### C - Combine GCRF/Newton project IDs with "other ODA" ones ###
 ### TO UPDATE ###
 
 # Read in other ODA UKRI projects
@@ -151,9 +206,10 @@ ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", shee
 ukri_projects_ids <- ukri_projects_ids %>% 
   rbind(ukri_gcrf_newton_ids)
 
-### c - Extract project info from GtR API ###
 
-# test: id <- "MR/K006533/1"
+### D - Extract project info from GtR API ###
+
+# id <- "AH/T007362/1"
 
 extract_ukri_projects_by_id <- function(id) {
   
@@ -178,68 +234,49 @@ extract_ukri_projects_by_id <- function(id) {
     # Extract project, lead org and co-investigator staff ids
     projects <- data$project
     lead_org <- data$leadResearchOrganisation
-    person_roles <- data$personRole %>% 
-      unnest(col = role) %>% 
-      filter(name == "CO_INVESTIGATOR") %>% 
-      select(id)
+    person_roles <- data$personRole
     
-    # Extract current organisation of staff
-    person_id <- "6E394347-A44B-4868-8EC3-06CA4D034BDA"
+    # Extract staff information (if applicable)
+    if(length(person_roles) > 0) {
+      
+      person_roles <- person_roles %>% 
+        unnest(col = role) %>% 
+        filter(name == "CO_INVESTIGATOR") %>% 
+        select(id)
     
-    staff_org_data <- data.frame()
-    
-    extract_staff_org <- function(person_id) {
-    
-      path <- paste0("http://gtr.ukri.org/person/", person_id)
-      request <- GET(url = path)
-      response <- content(request, as = "text", encoding = "UTF-8")
-      response <- fromJSON(response, flatten = TRUE) 
+      # Extract current organisation of staff
+      staff_org_data <- data.frame()
       
-      person_current_org <- ((response$personOverview)$organisation)$name
-      
-      staff_org_data <- rbind(staff_org_data, data.frame(person_id, person_current_org))
-      return(staff_org_data)
-    }
-    
-    for (person_id in person_roles$id) {
-      print(person_id)
-      staff_org_data <- extract_staff_org(person_id)
-    }
-
-    # Collapse staff partner orgs into single records
-    if(length(staff_org_data$person_current_org) > 0) {
-      
-      ## TO UPDATE ##
-      
-      org_roles <- org_roles %>% 
-        left_join(grid_institutes, by = c("org_name" = "name")) %>% 
-        left_join(grid_addresses, by = "grid_id") 
-      
-      org_names <- org_roles %>% 
-        select(org_name) %>% 
-        unique() %>% 
-        summarise(partner_name = paste(org_name, collapse = ", "))
-      
-      if("address.country" %in% names(org_roles)) {
-        org_countries <- org_roles %>% 
-          mutate(address.country = coalesce(address.country, country)) %>% 
-          select(address.country) %>% 
-          unique() %>% 
-          summarise(partner_country = paste(address.country[!is.na(address.country)], collapse = ", "))
-        
-      } else {
-        
-        org_countries <- org_roles %>% 
-          select(country) %>% 
-          unique() %>% 
-          summarise(partner_country = paste(country[!is.na(country)], collapse = ", "))
+      for (person_id in person_roles$id) {
+        staff_org_data <- extract_staff_org(staff_org_data, person_id)
       }
-        
-      org_roles_summarised <- cbind(org_names, org_countries)
+    
+      # Join on country of organisation
+      staff_org_data <- staff_org_data %>% 
+        mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>% 
+        unnest(col = person_current_org_country)
+    
       
+      # Collapse staff partner orgs and countries into single records
+      if(length(staff_org_data$person_current_org_name) > 0) {
+        
+        staff_org_names <- staff_org_data %>% 
+          select(person_current_org_name) %>% 
+          unique() %>% 
+          summarise(partner_name = paste(person_current_org_name, collapse = ", "))
+        
+        staff_org_countries <- staff_org_data %>% 
+          select(person_current_org_country) %>% 
+          filter(person_current_org_country != "Unknown") %>% 
+          unique() %>% 
+          summarise(partner_country = paste(person_current_org_country, collapse = ", "))
+        
+        org_roles_summarised <- cbind(staff_org_names, staff_org_countries)
+        
+      }
     }
     
-    # Start constructing data frame
+    # Start constructing project data frame
     project_data <- data.frame(
       title = projects[["title"]],
       status = projects[["status"]],
@@ -249,35 +286,20 @@ extract_ukri_projects_by_id <- function(id) {
       lead_org_name = lead_org[["name"]],
       last_updated = as.Date(last_updated))
     
-    # Unnest if a lead org address is given
-    if(length(lead_org[["address"]]) > 0) {
-      
-      lead_org_address <- lead_org[["address"]]
-      
-      # Extract lead org country
-      if("country" %in% names(lead_org_address)) {
-        project_data <- project_data %>% 
-          mutate(lead_org_country = lead_org_address$country) 
-        
-      } else {
-        project_data <- project_data %>% 
-          mutate(lead_org_country = "Unknown")              
-      }
-      
-    } else {
-      project_data <- project_data %>% 
-        mutate(lead_org_country = "Unknown")              
-    }
+    # Add country of lead org
+    project_data <- project_data %>% 
+      mutate(lead_org_country = map(lead_org[["id"]], extract_org_country)) %>% 
+      unnest(col = lead_org_country)
     
     # Attach partner org info
-    if(length(org_roles$name) == 0) {
-      project_data <- project_data %>% 
-        mutate(partner_org_name = "",
-               partner_org_country = "")
-    } else {
+    if(length(org_roles_summarised) > 0) {
       project_data <- project_data %>% 
         mutate(partner_org_name = org_roles_summarised$partner_name,
                partner_org_country = org_roles_summarised$partner_country)
+    } else {
+      project_data <- project_data %>% 
+        mutate(partner_org_name = "",
+               partner_org_country = "")
     }
     
     # Keep desired fields
@@ -285,29 +307,44 @@ extract_ukri_projects_by_id <- function(id) {
       select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
              lead_org_name, lead_org_country, partner_org_name, partner_org_country, last_updated) 
     
-    return(project_data)
+    
+  } else {
+    
+    # If no data available to extract, return empty dataframe
+    project_data <- data.frame()
   }
   
+  return(project_data)
 }
+
+
 
 # Create empty dataset to hold projects
 ukri_projects_by_id <- data.frame()
 
+# Run project info extraction over all GtR projects
+
+n <- 0 # set counter
+
 for (id in ukri_projects_ids$`GtR ID`) {
   
-  print(id)
+  print(paste0(n, " - ", id))
   
   data <- extract_ukri_projects_by_id(id)
   
   ukri_projects_by_id <- ukri_projects_by_id %>% 
     rbind(data)
   
+  n <- n+1
+  
 }
 
 saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 # ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
 
-### D 
+
+### E - Add on fund and funder labels
+
 # Join to fund and funder info from original list
 ukri_projects_by_id_with_id <- ukri_projects_by_id %>% 
   left_join(select(ukri_projects_ids, 
@@ -322,7 +359,7 @@ missing_awards <- select(ukri_projects_ids, `GtR ID`) %>%
 # Convert all factor fields to character
 ukri_projects_final <- data.frame(lapply(ukri_projects_by_id_with_id, as.character), stringsAsFactors=FALSE)
 
-
+# Output final dataset
 ukri_projects_final <- ukri_projects_final %>% 
   rename(start_date = fund.start,
          end_date = fund.end,
@@ -370,10 +407,11 @@ saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 # ukri_projects_final <- readRDS("Outputs/ukri_projects_final.rds") 
 
 
+
 # 2) Extract NIHR projects ------------------------------------------------
 
 # Define URL to extract ODA projects
-path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=100&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&refine.funder=NIHR+(ODA)")
+path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm")
 
 # Extract data from the NIHR API
 request <- GET(url = path)
