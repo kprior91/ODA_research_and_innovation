@@ -9,13 +9,14 @@ quarter_end_date <- as.Date("2021-06-30")
 # A) Extraction ----
 # Manually specify the IATI activities to extract transactions for
 
+# "GB-CHC-287287-DFID-PEDL",   # CEPR
+# "XI-GRID-GRID.419346.D-FCDO%20%300649%20%/%20%IFPRI%20%306101.006"   # IFPRI
+
 id_list <- c("US-EIN-042103594-PPE3978774",   # J-PAL
              "US-EIN-042103594-GCCI-3978870", # J-PAL
              "GB-CHC-1177110-R2HC",  # Elrha
              "GB-CHC-1177110-HIF",   # Elrha
-             "GB-CHC-287287-DFID-PEDL",   # CEPR
-             "GB-CHC-287287-PO8422-STEG", # CEPR
-             "XI-GRID-GRID.419346.D-FCDO 300649 / IFPRI 306101.006"   # IFPRI
+             "GB-CHC-287287-PO8422-STEG" # CEPR
              )
 
 # Function to extract transactions for a specified activity

@@ -24,7 +24,6 @@ if (!("tidyverse" %in% installed.packages())) {
 
 # Load packages -----
 library(jsonlite)
-#library(stringi)
 library(googlesheets4)
 library(gargle)
 library(httr)
@@ -252,18 +251,17 @@ saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
 
 # Limit size and number of columns for writing
 all_projects_tidied <- all_projects_tidied %>% 
- # select(-subject, -all_countries, -last_updated) %>% 
-  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2),
-         status = if_else(is.na(status), "Unknown",
-                          if_else(status == "Complete", "Closed", status))) %>% 
+  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2), 
+         # ensure end dates have not passed on "active" projects
+         status = if_else(!is.na(end_date),
+                          if_else(as.Date(end_date) <= Sys.Date(), "Closed", status), status)) %>% 
   unique() %>% 
-  filter(status != "Closed")
+  filter(status %in% c("Active", "Unknown"))
 
 # Remove Afghanistan projects
 all_projects_tidied <- all_projects_tidied %>% 
   filter(Country != "Afghanistan")
   
-
 # Write data to EC google drive 
 # Authorise googlesheets4 to view and manage sheets on EC Drive
 # (using saved authentication token in folder)
