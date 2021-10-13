@@ -383,12 +383,12 @@ activity_list_unnest_7 <- partner_activity_comb %>%
          period_end) %>% 
   # take first record for activities with multiple budgets for the same period
   group_by(iati_identifier, budget_status, currency, period_start, period_end) %>% 
-  slice(1) %>% 
+  top_n(n = 1) %>% 
   # remove unpopulated budget status records
   filter(!is.na(budget_status)) %>% 
   ungroup()
 
-# Find activities with multiple budgets
+# Find activities with multiple budgets for the same period
 multiple_budgets <- activity_list_unnest_7 %>% 
   group_by(iati_identifier, period_start, period_end) %>% 
   summarise(count = n()) %>% 
@@ -398,7 +398,7 @@ multiple_budgets <- activity_list_unnest_7 %>%
 activity_list_unnest_7_dedup <- activity_list_unnest_7 %>% 
   filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
            budget_status == "Committed") %>% 
-  group_by(iati_identifier, budget_status, currency) %>% 
+  group_by(iati_identifier, currency) %>%     # budget_status removed
   summarise(period_start = min(period_start),
             period_end = max(period_end),
             amount = sum(amount))
@@ -447,7 +447,7 @@ activity_list <- activity_list %>%
         # policy_marker_code, policy_marker_name, policy_significance, climate_focus,
          partner, partner_role, partner_ref, partner_country, gov_funder, 
          extending_org, fund,
-         budget_status, amount, period_start, period_end, currency) %>% 
+         amount, period_start, period_end, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date())
 
@@ -489,6 +489,5 @@ table(activity_list$gov_funder)
 table(activity_list$currency)
 
 # Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "Liverpool"))
-test2 <- filter(activity_list, str_detect(reporting_org, "Abdul"))
+test1 <- filter(activity_list, str_detect(reporting_org, "Energy Saving"))
 

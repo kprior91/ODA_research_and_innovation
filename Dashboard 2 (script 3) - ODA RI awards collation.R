@@ -8,32 +8,11 @@
 # - FCDO partners (spreadsheets)
 #####################################
 
-if (!("googlesheets4" %in% installed.packages())) {
-  install.packages("googlesheets4")
-}
-if (!("gargle" %in% installed.packages())) {
-  install.packages("gargle")
-}
-if (!("geonames" %in% installed.packages())) {
-  install.packages("geonames")
-}
-if (!("RgoogleMaps" %in% installed.packages())) {
-  install.packages("RgoogleMaps")
-}
-if (!("rworldmap" %in% installed.packages())) {
-  install.packages("rworldmap")
-}
-if (!("ggmap" %in% installed.packages())) {
-  install.packages("ggmap")
+if (!("httr" %in% installed.packages())) {
+  install.packages("httr")
 }
 if (!("jsonlite" %in% installed.packages())) {
   install.packages("jsonlite")
-}
-if (!("rvest" %in% installed.packages())) {
-  install.packages("rvest")
-}
-if (!("stringi" %in% installed.packages())) {
-  install.packages("stringi")
 }
 if (!("tidyverse" %in% installed.packages())) {
   install.packages("tidyverse")
@@ -41,9 +20,7 @@ if (!("tidyverse" %in% installed.packages())) {
 if (!("readxl" %in% installed.packages())) {
   install.packages("readxl")
 }
-if (!("writexl" %in% installed.packages())) {
-  install.packages("writexl")
-}
+
 
 # Load packages -----
 library(jsonlite)
@@ -414,7 +391,7 @@ saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 # 2) Extract NIHR projects ------------------------------------------------
 
 # Define URL to extract ODA projects
-path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm")
+path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&facet=pconnm&refine.funder=NIHR+(ODA)")
 
 # Extract data from the NIHR API
 request <- GET(url = path)
@@ -702,7 +679,7 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 
 
 # 7) CHECKING ----
-test1 <- filter(all_projects, str_detect(extending_org, "Liverpool"))
+test1 <- filter(all_projects, str_detect(extending_org, "NIHR"))
 test2 <- filter(all_projects, str_detect(id, "MR/N006267/1"))
 
 
