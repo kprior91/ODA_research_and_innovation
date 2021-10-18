@@ -624,12 +624,12 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
 # 6) BEIS RODA data (spreadsheet)
 
 # Read in BEIS data
-roda_extract <- read_excel("Inputs/BEIS RODA - GCRF non-UKRI Q1-21-22.xlsx", sheet = 2)
+roda_extract_gcrf <- read_excel("Inputs/BEIS RODA - GCRF non-UKRI Q1-21-22.xlsx", sheet = 2)
+roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
 
 # Reformat to match other datasetS
-roda_extract_final <- roda_extract %>% 
+roda_extract_gcrf_final <- roda_extract_gcrf %>% 
   rename(id = `Extending organisation - award ID`,
-         title = `Award title`,
          abstract = `Award description`,
          start_date = `Start date`,
          end_date = `End date`,
@@ -657,12 +657,40 @@ roda_extract_final <- roda_extract %>%
   select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`,  -Status)
 
 
+roda_extract_newton_final <- roda_extract_newton %>% 
+  rename(id = ID,
+         title = Title,
+         abstract = Description,
+         amount = `Value (Indicative)`,
+         recipient_country = `Recipient country`,
+         extending_org = `Lead Organisation`) %>% 
+  mutate(Fund = "Newton Fund",
+         Funder = "Department for Business, Energy and Industrial Strategy",
+         lead_org_name = "",
+         lead_org_country = "",
+         partner_org_name = "",
+         partner_org_country = "",
+         iati_id = "",
+         link = "",
+         start_date = as.character(coalesce(`Actual start date`, `Planned start date`)),
+         end_date = as.character(coalesce(`Actual end date`, `Planned end date`)),
+         currency = "GDP",
+         status = "",
+         period_start = "",
+         period_end = "",
+         subject = "",
+         last_updated = quarter_end_date
+  ) %>% 
+  select(-`Delivery partner`, -`Recipient region`, -`Planned start date`,
+         -`Planned end date`, -`Actual start date`, -`Actual end date`)
+
 
 # 7) Join 5 sources together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
-                      collated_spreadsheet_data, roda_extract_final)
+                      collated_spreadsheet_data, 
+                      roda_extract_gcrf_final, roda_extract_newton_final)
 
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
