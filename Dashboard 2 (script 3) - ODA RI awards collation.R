@@ -526,40 +526,31 @@ rm(response)
 # Read in public data on Wellcome Grants
 wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 
-# Read in partnerships data provided by Annie (Jan 21) - restrict to suspected ODA
-wellcome_partnerships <- read_excel("Inputs/Active Partnership record - 25 01 2021 (ODA labelled).xlsx") %>% 
-  filter(`ODA funding?` %in% c("Yes", "Maybe"),
-         `How the partnership is paid` != "Wellcome pays the partner, the partner pays the awardee",
-         `Partner Organisation(s)` != "Medical Research Council")  # exclude MRC ones - these will be on GtR
-
-# Join the two
-wellcome_grants_comb <- wellcome_grants %>% 
-  inner_join(wellcome_partnerships, by = c("Internal ID" = "Reference")) 
-
 # Add missing fields and format Funder/Fund field
-wellcome_grants_comb <- wellcome_grants_comb %>% 
+wellcome_grants_formatted <- wellcome_grants %>% 
   mutate(status = if_else(Sys.Date() <= `Planned Dates:End Date`, "Active", "Closed"),
          extending_org = "Wellcome Trust",
          currency = "GBP",
-         partner_org_name = "",
+         partner_org_name = `Other Implementing Organisations`,
          partner_org_country = `Research Location Countries`,
          recipient_country = "",
          period_start = "",
          period_end = "",
-         Funder = if_else(str_detect(`Partner Organisation(s)`, "National Institute for Health Research"), 
-                          "Department of Health and Social Care", `Partner Organisation(s)`),
+         iati_id = "",
+         Funder = if_else(str_detect(`Co-funder`, "National Institute for Health Research"), 
+                          "Department of Health and Social Care", `Co-funder`),
          Fund = if_else(Funder == "Department of Health and Social Care",
-                        "Global Health Research - Partnerships", "FCDO partially funded"),
+                        "Global Health Research - Partnerships", "FCDO Research - Programmes"),
          last_updated = quarter_end_date) 
 
 # Select desired variables
-wellcome_grants_comb <- wellcome_grants_comb %>% 
+wellcome_grants_formatted <- wellcome_grants_formatted %>% 
   select(id = `Internal ID`,
-         title = Title.x, 
+         title = Title, 
          abstract = Description,
          start_date = `Planned Dates:Start Date`,
          end_date = `Planned Dates:End Date`,
-         amount = `Amount Awarded`,
+         amount = `ODA funding`,
          period_start,
          period_end,
          currency,
@@ -568,17 +559,17 @@ wellcome_grants_comb <- wellcome_grants_comb %>%
          lead_org_country = `Recipient Org:Country`,
          partner_org_name,
          partner_org_country,
-         iati_id = `Partnership Name.x`,
+         iati_id,
          Fund,
          Funder, 
          recipient_country,
-         subject = `Master Grant Type Name`,
+         subject = `Partnership Name`,
          status,
          last_updated
   ) 
 
 # Format date fields for merging
-wellcome_grants_final <- wellcome_grants_comb %>% 
+wellcome_grants_final <- wellcome_grants_formatted %>% 
   mutate(start_date = as.character(start_date),
          end_date = as.character(end_date),
          link = "https://wellcome.org/grant-funding/funded-people-and-projects")
