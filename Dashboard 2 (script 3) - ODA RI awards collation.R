@@ -6,6 +6,7 @@
 # - IATI Registry 
 # - Wellcome Trust (spreadsheet)
 # - FCDO partners (spreadsheets)
+# - BEIS (RODA)
 #####################################
 
 
@@ -65,10 +66,7 @@ ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>%
 
 ### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
 
-# Read in other ODA UKRI projects
-ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
-
-# Join GCRF/Newton project IDs on  
+# Join GCRF/Newton project IDs to other ODA IDs 
 ukri_projects_ids <- ukri_projects_ids %>% 
   rbind(ukri_gcrf_newton_ids)
 
@@ -161,6 +159,13 @@ ukri_projects_final <- ukri_projects_final %>%
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 # ukri_projects_final <- readRDS("Outputs/ukri_projects_final.rds") 
 
+rm(missing_awards)
+rm(ukri_gcrf_newton_ids)
+rm(ukri_projects_by_fund)
+rm(ukri_projects_by_fund_with_id)
+rm(ukri_projects_by_id)
+rm(ukri_projects_by_id_with_id)
+rm(ukri_projects_ids)
 
 
 # 2) Extract NIHR projects ------------------------------------------------
@@ -229,6 +234,7 @@ nihr_projects_final <- nihr_projects %>%
 nihr_projects_final <- nihr_projects_final %>% 
   mutate(link = paste0("https://fundingawards.nihr.ac.uk/award/", id))
 
+rm(nihr_projects)
 
 # 3) Extract IATI projects ------------------------------------------------
 
@@ -262,8 +268,8 @@ iati_projects_final <- iati_projects %>%
          partner_org_name = "",
          partner_org_country = "",
          extending_org = coalesce(extending_org, reporting_org),
-         status = if_else(activity_status %in% c("Implementation", "Pipeline/identification", "Finalisation"), 
-                          "Active", activity_status),
+         status = if_else(!is.na(end_date),
+                                 if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),
          last_updated = quarter_end_date) %>% 
   select(id = iati_identifier,
          title = activity_title, 
@@ -295,12 +301,10 @@ iati_projects_final <- iati_projects_final %>%
 # Clean up
 rm(request)
 rm(response)
-
+rm(iati_activity_list)
+rm(iati_projects)
 
 # 4) Extract Wellcome projects ------------------------------------------------
-
-# Read in public data on Wellcome Grants
-wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 
 # Add missing fields and format Funder/Fund field
 wellcome_grants_formatted <- wellcome_grants %>% 
@@ -350,12 +354,13 @@ wellcome_grants_final <- wellcome_grants_formatted %>%
          end_date = as.character(end_date),
          link = "https://wellcome.org/grant-funding/funded-people-and-projects")
 
-
+rm(wellcome_grants)
+rm(wellcome_grants_formatted)
 
 # 5) FCDO spreadsheet data
 
 # Detect all Excel files in Data folder
-path = "C:\\Users\\e-clegg\\OneDrive - DFID\\PROJECT - MODARI\\2. Awards\\IATI\\External partner data\\2 - Completed returns"
+path = "Inputs//IATI returns"
 file_list <- list.files(path = path, pattern='*.xlsx', full.names = TRUE)
 
 # Read all files into R (skipping first 28 lines in Excel sheet as this contains no data)
@@ -404,14 +409,11 @@ saveRDS(collated_spreadsheet_data, file = "Outputs/collated_spreadsheet_data.rds
 
 # 6) BEIS RODA data (spreadsheet)
 
-# Read in BEIS data
-roda_extract_gcrf <- read_excel("Inputs/BEIS RODA - GCRF non-UKRI Q1-21-22.xlsx", sheet = 2)
-roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
-
 # Reformat to match other datasetS
 roda_extract_gcrf_final <- roda_extract_gcrf %>% 
   rename(id = `Extending organisation - award ID`,
          abstract = `Award description`,
+         title = `Award title`,
          start_date = `Start date`,
          end_date = `End date`,
          amount = `Award amount (£)`,
@@ -456,21 +458,25 @@ roda_extract_newton_final <- roda_extract_newton %>%
          start_date = as.character(coalesce(`Actual start date`, `Planned start date`)),
          end_date = as.character(coalesce(`Actual end date`, `Planned end date`)),
          currency = "GDP",
-         status = "",
          period_start = "",
          period_end = "",
          subject = "",
          last_updated = quarter_end_date
   ) %>% 
+  mutate(status = if_else(!is.na(end_date),
+                        if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown")) %>% 
   select(-`Delivery partner`, -`Recipient region`, -`Planned start date`,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
+
+rm(roda_extract_gcrf)
+rm(roda_extract_newton)
 
 
 # 7) Join 5 sources together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
-                      collated_spreadsheet_data, 
+                      collated_spreadsheet_data,
                       roda_extract_gcrf_final, roda_extract_newton_final)
 
 # Save as R file (to read back in if needed)

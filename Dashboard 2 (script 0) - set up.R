@@ -58,6 +58,19 @@ grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
 dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xlsx")
 
 
+### Input data ----
+
+# UKRI non GCRF/Newton project IDs
+ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
+
+# Wellcome ODA grant data
+wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
+
+# BEIS RODA GCRF/Newton extracts
+roda_extract_gcrf <- read_excel("Inputs/BEIS RODA - GCRF non-UKRI Q1-21-22.xlsx", sheet = 2)
+roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
+
+
 ### Functions -----
 
 
