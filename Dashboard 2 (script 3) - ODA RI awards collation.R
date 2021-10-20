@@ -397,6 +397,11 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          -`FCDO programme - IATI ID`, -Link)
 
 
+# Save as R file (to read back in if needed)
+saveRDS(collated_spreadsheet_data, file = "Outputs/collated_spreadsheet_data.rds")
+# collated_spreadsheet_data <- readRDS("Outputs/collated_spreadsheet_data.rds") 
+
+
 # 6) BEIS RODA data (spreadsheet)
 
 # Read in BEIS data
