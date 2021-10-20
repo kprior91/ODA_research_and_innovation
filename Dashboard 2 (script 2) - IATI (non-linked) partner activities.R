@@ -3,26 +3,6 @@
 # Extract ODA research activities from public IATI data #
 # --------------------------------------------------------------- #
 
-if (!("jsonlite" %in% installed.packages())) {
-  install.packages("jsonlite")
-}
-if (!("httr" %in% installed.packages())) {
-  install.packages("httr")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("tidyverse")
-}
-if (!("writexl" %in% installed.packages())) {
-  install.packages("writexl")
-}
-
-library(jsonlite)
-library(httr)
-library(tidyverse)
-library(readxl)
-library(writexl)
-
-
 ### A) Activity extract by ID (manually identified) ---
 
 # 1) Read in partner activity IATI list 
@@ -39,23 +19,6 @@ iati_activity_ids <- iati_activity_ids %>%
   mutate(iati_id = str_replace_all(iati_id, " ", "%20"))
 
 # 3) Extract specified partner activities from IATI Registry 
-iati_activity_extract <- function(activity_id) {
-  
-  path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  new_data <- response$results
-  
-  # Ensure "default flow type" field exists for joining datasets
-  if("default_flow_type.name" %in% names(new_data)) {
-    new_data <- new_data %>% 
-      mutate(default_flow_type = default_flow_type.name) %>% 
-      select(-default_flow_type.name, -default_flow_type.code)
-  } 
-  
-  return(new_data)
-}
 
 # Prepare results data frame and counters
 partner_activity_extract <- data.frame()
@@ -68,6 +31,12 @@ for (id in iati_activity_ids$iati_id) {
     partner_activity_extract <- rbind(partner_activity_extract, result)
 
 }
+
+# Save to Rdata file
+saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract.rds")
+# Restore the object
+# partner_activity_extract <- readRDS(file = "Outputs/partner_activity_extract.rds")
+
 
 ### B) Activity extract for specific partner organisations
 
@@ -84,33 +53,10 @@ org_code <- c(
 
 # 1) Activity extract
 
-# Function to extract large partner activities
-org_activity_extract <- function(page, org_code) {
-  path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  new_data <- response$results
-  
-  # Ensure "default flow type" field exists for joining datasets
-  if("default_flow_type.name" %in% names(new_data)) {
-    new_data <- new_data %>% 
-      mutate(default_flow_type = default_flow_type.name) %>% 
-      select(-default_flow_type.name, -default_flow_type.code)
-  } 
-  
-  results <- rbind(org_activity_list, new_data)
-  
-  return(results)
-}
-
 # Prepare results data frame and counters
 org_activity_list <- data.frame()
-new_rows <- 0
-page <- 1
 
 # Run extraction
-
 for (org in org_code) {
   new_rows <- 0
   page <- 1
@@ -118,7 +64,9 @@ for (org in org_code) {
   while (page == 1 | new_rows > 0) {
     print(paste0(org, "-", page))
     x <- nrow(org_activity_list)
-    org_activity_list <- org_activity_extract(page, org)
+      tryCatch({
+      org_activity_list <- org_activity_extract(page, org)
+      }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
     page <- page + 1
     y <- nrow(org_activity_list)
     new_rows = y - x
@@ -134,7 +82,7 @@ partner_activities_via_title <- org_activity_list %>%
          keep_empty = TRUE) %>% 
   filter(str_detect(text, "FCDO|DFID")) %>% 
   mutate(gov_funder = "Foreign, Commonwealth and Development Office",
-         fund = "FCDO fully funded") %>% 
+         fund = "FCDO Research - Partnerships") %>% 
   select(iati_identifier, gov_funder, fund) %>% 
   unique()
 
@@ -163,7 +111,7 @@ partner_activities_via_funder <- org_activity_list %>%
                         "Global Health Security - GAMRIF",  # IDRC GAMRIF projects
                    if_else(str_detect(text, "Health"), "Global Health Research - Partnerships", 
                            if_else(str_detect(iati_identifier, "XI-IATI-AGR|Windows1and2"),
-                                   "FCDO partially funded", "FCDO fully funded")))) %>% 
+                                   "FCDO Research - Partnerships", "FCDO Research - Programmes")))) %>% 
   select(iati_identifier, activity_id, gov_funder, fund) %>% 
   unique()
 
@@ -186,10 +134,11 @@ partner_activity_comb <- plyr::rbind.fill(partner_activity_extract, partner_acti
   rename(fcdo_activity_id = activity_id)
 
 rm(partner_activity_extract)
+rm(partner_activities)
 rm(partner_activities_via_title)
 rm(partner_activities_via_funder)
-rm(partner_activities)
-
+rm(result)
+rm(red_linked_activites)
 
 # D) Extract accompanying data ----------------------------------------------
 
@@ -243,12 +192,59 @@ activity_list_unnest_1 <- activity_list_unnest_1 %>%
 activity_list_unnest_2 <- partner_activity_comb %>% 
   unnest(cols = recipient_country,
          keep_empty = TRUE) %>% 
-  select(iati_identifier, country.code, country.name) %>% 
+  select(iati_identifier, country.name) %>% 
   group_by(iati_identifier) %>%
   unique() %>% 
-  summarise(country_code = paste(coalesce(country.code, ""), collapse = ", "),
-            country_name = paste(coalesce(country.name, ""), collapse = ", "))
+  summarise(country_name = paste(coalesce(country.name, ""), collapse = ", "))
 
+  # Identify activities without recipient countries at activity level
+  no_country_info <- activity_list_unnest_2 %>% 
+    filter(country_name == "")
+  
+  # Extract transactions for these activities
+      
+     # Prepare results data frame and counters
+      transaction_list <- data.frame()
+  
+     # Run extraction, stopping when no new transactions are returned
+      for (id in no_country_info$iati_identifier) {
+        new_rows <- 0
+        page <- 1
+        
+        while (page == 1 | new_rows > 0) {
+          print(paste0(id, "-", page))
+          x <- nrow(transaction_list)
+          transaction_list <- transactions_extract(id, page, transaction_list)
+          page <- page + 1
+          y <- nrow(transaction_list)
+          new_rows = y - x
+        }
+      }
+      
+      # Unnest information -----
+      
+      transactions_unnest <- transaction_list %>% 
+        unnest(cols = recipient_countries,
+               keep_empty = TRUE) %>%
+        select(-country.url, -recipient_countries, -recipient_regions) %>% 
+        rename(recipient_country = country.name) %>% 
+  
+        # remove transactions without a country
+        filter(!is.na(recipient_country)) %>%      
+
+        # summarise countries 
+        select(iati_identifier, recipient_country) %>% 
+        unique() %>% 
+        group_by(iati_identifier) %>% 
+        summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
+      
+      
+  # Join on transactions country info to rest of dataset
+  activity_list_unnest_2_comp <- activity_list_unnest_2 %>% 
+    left_join(transactions_unnest, by = "iati_identifier") %>% 
+    mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
+    select(-country_name)
+  
 
 # 3) Unlist sectors
 activity_list_unnest_3 <- partner_activity_comb %>% 
@@ -285,19 +281,13 @@ activity_list_unnest_4 <- partner_activity_comb %>%
     str_detect(ref, "US") ~ "United States", 
     str_detect(ref, "NL") ~ "Netherlands",
     str_detect(ref, "CA-") ~ "Canada",
-    str_detect(ref, "IN-") ~ "India"
+    str_detect(ref, "IN-") ~ "India",
+    str_detect(ref, "KE-") ~ "Kenya",
+    str_detect(ref, "ZA-") ~ "South Africa",
   )) 
 
+
 # Match institutions to countries with GRID database
-grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
-  select(grid_id, name) %>% 
-  unique()
-
-grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>% 
-  select(grid_id, country, country_code) %>% 
-  unique()
-
-grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
 
 country_match <- activity_list_unnest_4 %>% 
   left_join(grid_institutes, by = c("text" = "name")) %>% 
@@ -405,7 +395,7 @@ activity_list_unnest_7_dedup <- activity_list_unnest_7 %>%
 
 
 # 8) Unlist start/end dates
-activity_list_unnest_9 <- partner_activity_comb %>% 
+activity_list_unnest_8 <- partner_activity_comb %>% 
   unnest(cols = activity_date,
          keep_empty = TRUE) %>% 
   select(iati_identifier, 
@@ -423,14 +413,13 @@ activity_list_unnest_9 <- partner_activity_comb %>%
 # Join unnested info to original data
 activity_list <- activity_list_base %>% 
   left_join(activity_list_unnest_1, by = "iati_identifier") %>%
-  left_join(activity_list_unnest_2, by = "iati_identifier") %>%
+  left_join(activity_list_unnest_2_comp, by = "iati_identifier") %>%
   left_join(activity_list_unnest_3, by = "iati_identifier") %>%
   left_join(activity_list_unnest_4, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_5, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_6, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_7_dedup, by = "iati_identifier") %>% 
-  #left_join(activity_list_unnest_8, by = "iati_identifier") %>% 
-  left_join(activity_list_unnest_9, by = "iati_identifier") 
+  left_join(activity_list_unnest_8, by = "iati_identifier")
 
 
 # Assign a reporting org if the reporting partner is implementing 
@@ -442,9 +431,8 @@ activity_list <- activity_list %>%
 activity_list <- activity_list %>% 
   select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
          hierarchy, activity_status, flow_type, fcdo_activity_id,
-         activity_title, General, Objectives, country_code, start_date, end_date,
-         country_name, sector_code, sector_name,
-        # policy_marker_code, policy_marker_name, policy_significance, climate_focus,
+         activity_title, General, Objectives, start_date, end_date,
+         recipient_country, sector_code, sector_name,
          partner, partner_role, partner_ref, partner_country, gov_funder, 
          extending_org, fund,
          amount, period_start, period_end, currency) %>% 
@@ -457,12 +445,11 @@ activity_list <- activity_list %>%
     left_join(select(iati_activity_ids, gov_funder, iati_id, funding_iati_id), 
               by = c("iati_identifier" = "iati_id", "gov_funder")) %>% 
     mutate(programme_id = coalesce(funding_iati_id, fcdo_activity_id)) %>% 
-    mutate(fund = coalesce(fund, "FCDO fully funded"),
+    mutate(fund = coalesce(fund, "FCDO Research - Programmes"),
            gov_funder = coalesce(gov_funder, "Foreign, Commonwealth and Development Office"))
 
 
 activity_list <- activity_list %>% 
-  mutate(all_countries = country_name) %>% 
   rename(activity_description = General)
 
 # Remove WHO non-research/innovation activities
@@ -489,5 +476,5 @@ table(activity_list$gov_funder)
 table(activity_list$currency)
 
 # Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "Energy Saving"))
+test1 <- filter(activity_list, str_detect(reporting_org, "Elrha"))
 

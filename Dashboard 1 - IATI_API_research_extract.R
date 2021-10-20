@@ -2,26 +2,6 @@
 # Extract ODA research activities from public IATI data #
 # --------------------------------------------------------------- #
 
-if (!("jsonlite" %in% installed.packages())) {
-  install.packages("jsonlite")
-}
-if (!("httr" %in% installed.packages())) {
-  install.packages("httr")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("tidyverse")
-}
-if (!("writexl" %in% installed.packages())) {
-  install.packages("writexl")
-}
-
-library(jsonlite)
-library(httr)
-library(tidyverse)
-library(readxl)
-library(writexl)
-
-
 # 1) Extract list of research sector codes from IATI -----------------------------
 
 # Function to extract 5-digit sector codes
@@ -89,8 +69,6 @@ uk_gov_extract <- function(page, org_code) {
 
 # Prepare results data frame and counters
 uk_gov_list_final <- data.frame()
-new_rows <- 0
-page <- 1
 
 # Run extraction, stopping when no new sector codes returned
 
@@ -114,7 +92,7 @@ saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final.rds")
 
 
 # 3) Restrict to ODA R&I activities -----------
-# (eventually via the R&I "tag" field)
+# (via the R&I "tag" field)
 
 # Unnest tags
 uk_gov_ri_programmes <- uk_gov_list_final %>% 
@@ -391,7 +369,7 @@ gov_list <- gov_list %>%
     (str_detect(iati_identifier, "NIHR") | str_detect(activity_title, "NIHR")) ~ "Global Health Research - Programmes",
     str_detect(iati_identifier, "ICF") ~ "International Climate Finance (ICF)",
     str_detect(iati_identifier, "Chevening") ~ "Chevening Scholarships",
-    str_detect(iati_identifier, "GB-1-|GB-GOV-1-") ~ "FCDO Research & Innovation",
+    str_detect(iati_identifier, "GB-1-|GB-GOV-1-") ~ "FCDO Research - Programmes",
     TRUE ~ "Other"
   ))
 

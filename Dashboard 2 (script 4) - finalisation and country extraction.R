@@ -1,42 +1,15 @@
 #####################################
-# Script 5 
-# Add data collected by spreadsheet from FCDO partners
+# Script 4 
+# Split rows by country for Tableau
 #####################################
 
-if (!("googlesheets4" %in% installed.packages())) {
-  install.packages("googlesheets4")
-}
-if (!("gargle" %in% installed.packages())) {
-  install.packages("gargle")
-}
-if (!("jsonlite" %in% installed.packages())) {
-  install.packages("jsonlite")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("httr")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("tidyverse")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("readxl")
-}
-
-# Load packages -----
-library(jsonlite)
-library(googlesheets4)
-library(gargle)
-library(httr)
-library(tidyverse)
-library(readxl)
-
-# Read in data from script 4
-all_projects_transactions <- readRDS(file = "Outputs/all_projects_transactions.rds")
+# Read in data from script 3
+all_projects <- readRDS("Outputs/all_projects.rds") 
 
 # 1) Extract countries -----------------------------------
 
 # Distinguish location and beneficiary countries in main dataset
-all_projects_final <- all_projects_transactions %>% 
+all_projects_final <- all_projects %>% 
   mutate(location_country = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, "")),
          beneficiary_country = recipient_country)
 
@@ -85,8 +58,6 @@ all_projects_split_country <- countries_data %>%
   filter(!(Country %in% c("", "NA", "Unknown")) & !is.na(Country)) %>% 
   arrange(id)
 
-# Read in DAC country lookup and Tableau accepted country list
-dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xlsx")
 
 # Check countries that are unmatched (this information will be lost)
 unmatched_countries <- all_projects_split_country %>%
@@ -138,13 +109,14 @@ all_projects_tidied <- all_projects_tidied %>%
   mutate(Country = if_else(is.na(Country), "Unknown", Country)) %>% 
   select(-exclude_flag)
 
+# Tidy fund and funder labelling
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO fully funded", Fund),
+  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO Research - Programmes", Fund),
          Funder = if_else(str_detect(Funder, "Foreign, Commonwealth & Development Office|FCDO"), "Foreign, Commonwealth and Development Office", Funder)) 
 
+# Manually edit country info for Chevening
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Funder = if_else(Funder == "National Institutes of Health", "Department of Health and Social Care", Funder),
-         lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
+  mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
          Country = if_else(Fund == "Chevening Scholarships" & country_type == 2, "United Kingdom", Country))
 
 # Add FCDO programme ID
@@ -166,27 +138,7 @@ gov_funder_iati_ids <- all_projects_tidied %>%
   filter(str_detect(iati_id, "GB-1-|GB-GOV-1-")) %>% 
   unique()
 
-# Function to extract programme names from IATI
 
-extract_iati_activity_name <- function(activity_id) {
-  
-  path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=title")
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  new_data <- response$results 
-  
-  if(length(new_data) > 0) {
-    new_data <- new_data %>% 
-      unnest(col = title.narrative) %>% 
-      select(funder_iati_id = iati_identifier, funder_programme = text)
-  } else {
-    new_data <- data.frame()
-  }
-  
-  return(new_data)
-  
-}
 
 # Create empty dataframe to hold name extract from IATI
 gov_funder_programme_names <- data.frame()
@@ -251,12 +203,9 @@ saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
 
 # Limit size and number of columns for writing
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2), 
-         # ensure end dates have not passed on "active" projects
-         status = if_else(!is.na(end_date),
-                          if_else(as.Date(end_date) <= Sys.Date(), "Closed", status), status)) %>% 
-  unique() %>% 
-  filter(status %in% c("Active", "Unknown"))
+  mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2)) %>% 
+  filter(status %in% c("Active", "Unknown")) %>% 
+  unique()
 
 # Remove Afghanistan projects
 all_projects_tidied <- all_projects_tidied %>% 
@@ -278,16 +227,6 @@ results_sheet <- sheet_write(all_projects_tidied,
 # 5) Testing ---------------------------------------
 
 unique(all_projects_tidied$Funder)
-
-test <- filter(all_projects, extending_org == "GSMA Foundation")
-
-test2 <- filter(all_projects_final, extending_org == "Institute of Development Studies")
-
-test <- filter(all_projects_tidied, str_detect(fcdo_programme_id, "202766"))
-
-test <- filter(all_projects_transactions, str_detect(iati_id, "202766"))
-
-test <- filter(all_projects_tidied, str_detect(id, "MR/N006267/1"))
 
 # Look at data from a particular delivery partner
 test <- filter(all_projects_tidied, extending_org == "Bill & Melinda Gates Foundation")

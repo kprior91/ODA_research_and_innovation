@@ -8,120 +8,10 @@
 # - FCDO partners (spreadsheets)
 #####################################
 
-if (!("httr" %in% installed.packages())) {
-  install.packages("httr")
-}
-if (!("jsonlite" %in% installed.packages())) {
-  install.packages("jsonlite")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("tidyverse")
-}
-if (!("readxl" %in% installed.packages())) {
-  install.packages("readxl")
-}
 
+# 1) Extract UKRI projects -------------------------------------------
 
-# Load packages -----
-library(jsonlite)
-library(httr)
-library(tidyverse)
-library(readxl)
-
-
-# 1) Set up -------------------------------------------
-
-# Set quarter end date
-quarter_end_date <- as.Date("2021-06-30")
-
-# Read in GRID data
-
-grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
-  select(grid_id, name) %>% 
-  unique()  %>% 
-    # Remove common organisation names
-  filter(!(name %in% c("Ministry of Health", "Ministry of Public Health")))
-
-grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>% 
-  select(grid_id, country, country_code) %>% 
-  unique()
-
-grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
-
-
-
-# 2) Extract UKRI projects -------------------------------------------
-
-### A - Define UKRI API functions ###
-
-# 1 - Function to extract project IDs by fund name (GCRF/Newton)
-extract_ukri_projects_by_fund <- function(page, fund) {
-  
-  path <- paste0("https://gtr.ukri.org:443/gtr/api/projects?q=",
-                 fund, "&f=pro.rcukp&p=", page, "&s=100")
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  projects <- response$project
-  
-  return(projects)
-}
-
-
-# 2 - Function to extract staff organisation
-# person_id <- "6E394347-A44B-4868-8EC3-06CA4D034BDA"
-
-extract_staff_org <- function(staff_data, person_id) {
-  
-  path <- paste0("http://gtr.ukri.org/person/", person_id)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  
-  person_current_org_name <- ((response$personOverview)$organisation)$name
-  person_current_org_id <- ((response$personOverview)$organisation)$id
-  
-  staff_org_data <- rbind(staff_data, data.frame(person_id, 
-                                                     person_current_org_name,
-                                                     person_current_org_id))
-  return(staff_org_data)
-}
-
-
-# 3 - Function to extract country from organisation ID
-# (checking GRID database as well as UKRI)
-# org_id <- "3ED60B49-9C2B-4D71-B644-96CCC7F10194"
-
-extract_org_country <- function(org_id) {
-  
-  path <- paste0("http://gtr.ukri.org/organisation/", org_id)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  
-  # Look up country from UKRI GtR 
-  org_address <- ((response$organisationOverview)$organisation)$address
-  
-    if("country" %in% names(org_address)) {
-      org_country_ukri <- org_address$country
-      
-    } else {
-      org_country_ukri <- "Unknown"
-    }
-  
-  # Look up country from GRID database
-  grid_org_search <- data.frame(name = ((response$organisationOverview)$organisation)$name) %>% 
-    left_join(grid_institutes, by = "name") %>% 
-    left_join(grid_addresses, by = "grid_id")
-  
-  # Use GRID country over UKRI GtR one
-  org_country <- coalesce(grid_org_search$country, org_country_ukri)
-  
-  return(org_country)
-}
-
-
-### B - Extract GCRF/Newton project IDs ###
+### A - Extract GCRF/Newton project IDs ###
 
 # Create empty dataset to hold projects
 ukri_projects_by_fund <- data.frame()
@@ -173,8 +63,7 @@ ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>%
   select(`Funder IATI ID`, Fund, Funder, `Extending Org` = leadFunder, `GtR ID`)
 
 
-### C - Combine GCRF/Newton project IDs with "other ODA" ones ###
-### TO UPDATE ###
+### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
 
 # Read in other ODA UKRI projects
 ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
@@ -184,120 +73,7 @@ ukri_projects_ids <- ukri_projects_ids %>%
   rbind(ukri_gcrf_newton_ids)
 
 
-### D - Extract project info from GtR API ###
-
-# id <- "102643"
-
-extract_ukri_projects_by_id <- function(id) {
-  
-  path <- paste0("http://gtr.ukri.org/projects?ref=", id)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  
-  # extract project data and last refresh date
-  data <- response$projectOverview
-  
-  last_updated <- (response$lastRefreshDate)$lastRefreshDate %>% 
-    str_replace_all("Data last updated:  ", "") %>% 
-    as.Date(format = "%d %b %Y")
-
-  
-  if(length(data) > 0) {
-    
-    # Unlist first level
-    data <- data$projectComposition
-    
-    # Extract project, lead org and co-investigator staff ids
-    projects <- data$project
-    lead_org <- data$leadResearchOrganisation
-    person_roles <- data$personRole
-    
-    # Extract staff information (if applicable)
-    if(length(person_roles) > 0) {                        # checks length of list
-      
-        person_roles <- person_roles %>% 
-          unnest(col = role) %>% 
-          filter(name == "CO_INVESTIGATOR") %>% 
-          select(id)
-      
-              if(nrow(person_roles) > 0) {                # checks no. of rows in dataframe
-                
-              # Extract current organisation of staff
-              staff_org_data <- data.frame()
-              
-              for (person_id in person_roles$id) {
-                staff_org_data <- extract_staff_org(staff_org_data, person_id)
-              }
-            
-              # Join on country of organisation
-              staff_org_data <- staff_org_data %>% 
-                mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>% 
-                unnest(col = person_current_org_country)
-            
-              
-              # Collapse staff partner orgs and countries into single records
-              if(length(staff_org_data$person_current_org_name) > 0) {
-                
-                staff_org_names <- staff_org_data %>% 
-                  select(person_current_org_name) %>% 
-                  unique() %>% 
-                  summarise(partner_name = paste(person_current_org_name, collapse = ", "))
-                
-                staff_org_countries <- staff_org_data %>% 
-                  select(person_current_org_country) %>% 
-                  filter(person_current_org_country != "Unknown") %>% 
-                  unique() %>% 
-                  summarise(partner_country = paste(person_current_org_country, collapse = ", "))
-                
-                org_roles_summarised <- cbind(staff_org_names, staff_org_countries)
-                
-              }
-          }
-    }
-    
-    # Start constructing project data frame
-    project_data <- data.frame(
-      title = projects[["title"]],
-      status = projects[["status"]],
-      gtr_id = projects[["grantReference"]],
-      fund = projects[["fund"]],
-      abstract = projects[["abstractText"]],
-      lead_org_name = lead_org[["name"]],
-      last_updated = as.Date(last_updated))
-    
-    # Add country of lead org
-    project_data <- project_data %>% 
-      mutate(lead_org_country = map(lead_org[["id"]], extract_org_country)) %>% 
-      unnest(col = lead_org_country)
-    
-    # Attach partner org info
-    if(exists("org_roles_summarised")) {
-      project_data <- project_data %>% 
-        mutate(partner_org_name = org_roles_summarised$partner_name,
-               partner_org_country = org_roles_summarised$partner_country)
-    } else {
-      project_data <- project_data %>% 
-        mutate(partner_org_name = "",
-               partner_org_country = "")
-    }
-    
-    # Keep desired fields
-    project_data <- project_data %>% 
-      select(gtr_id, title, abstract, fund.start, fund.end, amount = fund.valuePounds, extending_org = fund.funder.name,
-             lead_org_name, lead_org_country, partner_org_name, partner_org_country, last_updated) 
-    
-    
-  } else {
-    
-    # If no data available to extract, return empty dataframe
-    project_data <- data.frame()
-  }
-  
-  return(project_data)
-}
-
-
+### C - Extract project info from GtR API ###
 
 # Create empty dataset to hold projects
 ukri_projects_by_id <- data.frame()
@@ -351,7 +127,6 @@ ukri_projects_final <- ukri_projects_final %>%
          period_start = "",
          period_end = "",
          currency = "GBP",
-         status = if_else(as.Date(end_date) > Sys.Date(), "Active", "Closed"),
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
                         if_else(Fund == "Newton", "Newton Fund", Fund)),
          last_updated = as.Date(last_updated)) %>% 
@@ -458,21 +233,22 @@ nihr_projects_final <- nihr_projects_final %>%
 # 3) Extract IATI projects ------------------------------------------------
 
 # Read in list of IATI activities (from funders and select delivery partners)
-iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
+iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds") %>% 
+  rename(recipient_country = all_countries)
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
 # Filter gov department records for minimum granularity
 iati_projects <- iati_activity_list %>%
   filter(  str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
            str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
-           str_detect(iati_identifier, "1-204584") |   # Policy Research Fund (FCDO)  
-           str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
-           str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
-           str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
-           str_detect(iati_identifier, "NEWT-BC") |  # British Council
-           str_detect(iati_identifier, "GCRF-Clm") |  # Academies
-           str_detect(iati_identifier, "RS-GCRF|NEWT-RS") |  # Royal Society
-           str_detect(iati_identifier, "RAENG-GCRF|NEWT-RAE") |  # Royal Academy of Engineering
+           str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
+        #   str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
+        #   str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
+        #   str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
+        #   str_detect(iati_identifier, "NEWT-BC") |  # British Council
+        #   str_detect(iati_identifier, "GCRF-Clm") |  # Academies
+        #   str_detect(iati_identifier, "RS-GCRF|NEWT-RS") |  # Royal Society
+        #   str_detect(iati_identifier, "RAENG-GCRF|NEWT-RAE") |  # Royal Academy of Engineering
            str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
   ) %>%    
   filter(flow_type == "ODA") %>% 
@@ -506,7 +282,7 @@ iati_projects_final <- iati_projects %>%
          iati_id = programme_id,
          Fund = fund,
          Funder, 
-         recipient_country = all_countries,
+         recipient_country,
          subject = sector_name,
          status,
          last_updated

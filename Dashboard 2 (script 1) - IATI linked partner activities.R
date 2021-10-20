@@ -4,25 +4,6 @@
 # by an incoming fund transaction activity ID
 # --------------------------------------------------------------- #
 
-if (!("jsonlite" %in% installed.packages())) {
-  install.packages("jsonlite")
-}
-if (!("httr" %in% installed.packages())) {
-  install.packages("httr")
-}
-if (!("tidyverse" %in% installed.packages())) {
-  install.packages("tidyverse")
-}
-if (!("writexl" %in% installed.packages())) {
-  install.packages("writexl")
-}
-
-library(jsonlite)
-library(httr)
-library(tidyverse)
-library(readxl)
-library(writexl)
-
 ###
 # A) Create list of RED programmes and components -----
 
