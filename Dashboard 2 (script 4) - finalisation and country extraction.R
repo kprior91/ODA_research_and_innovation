@@ -181,15 +181,15 @@ table(all_projects_tidied$Funder)
 
 # 6) Write data --------------------------------
 
-# Write to RDS 
-saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
-# all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
-
 # Restrict to active projects for Tableau
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2)) %>% 
   filter(status %in% c("Active", "Unknown")) %>% 
   unique()
+
+# Write to RDS 
+saveRDS(all_projects_tidied, "Outputs/all_projects_tidied.rds")
+# all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
 # Write data to EC google drive 
 # Authorise googlesheets4 to view and manage sheets on EC Drive
@@ -228,7 +228,7 @@ test4 <- filter(all_projects_tidied, str_detect(Funder, "Rural"))
 
 test <- filter(all_projects_split_country, str_detect(id, "GCRFNGR6"))
 test <- filter(all_projects_tidied, id == "GCRFNGR6\1548")
-test <- filter(all_projects_tidied, str_detect(title, "(round 4)"))
+test <- filter(all_projects_tidied, str_detect(title, "UMURINZI"))
 
 
 

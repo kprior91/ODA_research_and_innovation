@@ -269,9 +269,10 @@ iati_projects <- iati_activity_list %>%
 # Keep required fields
 iati_projects_final <- iati_projects %>% 
   mutate(Funder = coalesce(gov_funder, reporting_org),
+         partner_org_name = partner,
+         partner_org_country = partner_country,         
+         lead_org_name = coalesce(extending_org, reporting_org),
          lead_org_country = "",
-         partner_org_name = "",
-         partner_org_country = "",
          extending_org = coalesce(extending_org, reporting_org),
          status = if_else(!is.na(end_date),
                                  if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),
@@ -286,8 +287,8 @@ iati_projects_final <- iati_projects %>%
          period_end,
          currency,
          extending_org,
-         lead_org_name = partner,
-         lead_org_country = partner_country,
+         lead_org_name,
+         lead_org_country,
          partner_org_name,
          partner_org_country,
          iati_id = programme_id,
@@ -489,7 +490,8 @@ rm(roda_extract_newton)
 all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
                       collated_spreadsheet_data,
-                      roda_extract_gcrf_final, roda_extract_newton_final)
+                      roda_extract_gcrf_final, roda_extract_newton_final) %>% 
+                unique()
 
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
@@ -501,4 +503,6 @@ test1 <- filter(all_projects, str_detect(extending_org, "NIHR"))
 test2 <- filter(all_projects, str_detect(id, "MR/N006267/1"))
 test3 <- filter(all_projects, str_detect(Funder, "Rural"))
 
+# Example UKRI project funded by BEIS GCRF, FCDO and DHSC
+test4 <- filter(all_projects, str_detect(id, "MR/M009211/1"))
 
