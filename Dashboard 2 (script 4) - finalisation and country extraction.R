@@ -19,23 +19,28 @@ countries_data <- all_projects_final %>%
   gather(key = "country_type", value = "Country", -id) %>% 
   right_join(select(all_projects_final, -beneficiary_country, -location_country), by = "id")
 
-# Create one row per country
+# Convert dataset to long with one row per country entry
 all_projects_split_country <- countries_data %>%
   select(id, extending_org, country_type, Country) %>% 
-  mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of|Tanzania, United Republic of", "Tanzania")) %>%
+  mutate(Country = str_replace_all(Country, "Tanzania, United Republic Of|Tanzania, United Republic of", "Tanzania"),
+         Country = if_else(Country %in% c("Congo (the Democratic Republic of the)", "DRC"), 
+                           "Democratic Republic of the Congo", Country)) %>%
   mutate(Country = str_replace_all(Country, ";", ",")) %>%
   mutate(Country = gsub("\\s*\\([^\\)]+\\)","", as.character(Country))) %>%
-  separate_rows(Country, sep = ",", convert = FALSE) %>%
+  separate_rows(Country, sep = ",", convert = FALSE) 
+
+# Clean country field
+all_projects_split_country <- all_projects_split_country %>% 
   mutate(Country = str_trim(Country)) %>% 
   mutate(Country = str_replace_all(Country, c("UK|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM"), "United Kingdom"),
-         Country = str_replace_all(Country, c("USA|UNITED STATES|United states"), "United States"),
+         Country = str_replace_all(Country, c("USA|Usa|UNITED STATES|United states|United States Of America"), "United States"),
          Country = str_replace(Country, "N/A", "Unknown"),
          Country = str_replace(Country, "The Netherlands", "Netherlands"),
          Country = str_replace(Country, "The Philippines", "Philippines"),
          Country = if_else(str_detect(Country, "Ivoire"), "Ivory Coast", Country),
          Country = str_replace(Country, "Republic of Congo", "Congo Republic"),
-         Country = str_replace(Country, "DRC", "Democratic Republic of the Congo"),
-         Country = if_else(str_detect(Country, "Hong Kong"), "Hong Kong", Country)) %>% 
+         Country = if_else(str_detect(Country, "Hong Kong"), "Hong Kong", Country),
+         Country = if_else(str_detect(Country, "Viet Nam"), "Vietnam", Country)) %>% 
   unique() %>% 
   filter(!(Country %in% c("", "NA", "Unknown")) & !is.na(Country)) %>% 
   arrange(id)
@@ -61,41 +66,48 @@ all_projects_final <- countries_data %>%
 # Add row ID field to dataset
 all_projects_final$row_id <- seq.int(nrow(all_projects_final))
 
+rm(all_projects)
+rm(all_projects_split_country)
 
-# 2) Tidy country info (i.e. remove unnecessary duplicate records) ---------------
+# 2) Tidy country info (i.e. remove unnecessary "unknown"s) ---------------
 
 # Extract project records with unknown or missing country field
-missing_country_projects <- filter(all_projects_final, 
+unknown_country_projects <- filter(all_projects_final, 
                                    Country %in% c("Unknown") | is.na(Country)) %>% 
-  select(row_id, id, country_type) %>% 
+  select(row_id, id) %>% 
   unique() %>% 
-  mutate(exclude_flag = 1)
+  mutate(exclude = 1)
 
 # Identify projects that have both a populated and missing country field 
+# Restrict to just the populated fields (to keep)
 duplicate_country_projects <- filter(all_projects_final, 
                                      !(Country %in% c("Unknown") | is.na(Country))) %>% 
-  select(row_id, id, country_type) %>% 
+  select(row_id, id) %>% 
   unique() %>% 
-  filter(id %in% missing_country_projects$id) 
+  filter(id %in% unknown_country_projects$id) %>% 
+  mutate(keep = 1)
 
-# Exclude project records with unknown/missing location or beneficiary country AND
-# a populated other country record
+
+# Exclude project records for "Unknown" country when the project has other country info
 all_projects_tidied <- all_projects_final %>% 
-  left_join(missing_country_projects, by = c("row_id", "id", "country_type")) %>% 
-  filter(!(exclude_flag == 1 & country_type == "beneficiary_country" & (Country %in% c("Unknown") | is.na(Country))))
+  left_join(unknown_country_projects, by = c("row_id", "id")) %>% 
+  left_join(duplicate_country_projects, by = c("row_id", "id")) %>%
+  filter(keep == 1 |
+         exclude == 1 & !(id %in% duplicate_country_projects$id) |
+         is.na(keep) & is.na(exclude)) %>% 
+  select(-keep, -exclude) %>% 
+  mutate(Country = coalesce(Country, "Unknown"))
 
-# Label unknown/missing countries as "Unknown" to remove NULLs from Tableau map
-all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Country = if_else(is.na(Country), "Unknown", Country)) %>% 
-  select(-exclude_flag)
-
+rm(all_projects_final)
+rm(unknown_country_projects)
+rm(duplicate_country_projects)
 
 # 3) Add funder programme names ------------------
 
 # Tidy fund and funder labelling
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Fund = if_else(str_detect(Fund, "FCDO Research"), "FCDO Research - Programmes", Fund),
-         Funder = if_else(str_detect(Funder, "Foreign, Commonwealth & Development Office|FCDO"), "Foreign, Commonwealth and Development Office", Funder)) 
+  mutate(Fund = if_else(str_detect(Fund, "FCDO Research & Innovation|FCDO fully"), "FCDO Research - Programmes", Fund),
+         Fund = if_else(str_detect(Fund, "FCDO partially"), "FCDO Research - Partnerships", Fund))
 
 # Add FCDO programme ID to dataset
 all_projects_tidied <- all_projects_tidied %>% 
@@ -124,8 +136,8 @@ all_projects_tidied <- all_projects_tidied %>%
       gov_funder_programme_names <- rbind(gov_funder_programme_names, data)
     }
 
-    # Join funder programme name to main dataset
-    all_projects_tidied <- all_projects_tidied %>%
+# Join funder programme name to main dataset
+all_projects_tidied <- all_projects_tidied %>%
       left_join(gov_funder_programme_names, by = c("iati_id" = "funder_iati_id")) 
 
 
@@ -194,15 +206,29 @@ results_sheet <- sheet_write(all_projects_tidied,
 
 # 7) Testing ---------------------------------------
 
+# Number of unique projects
+length(unique(all_projects_tidied$id))
+
 # Look at data from a particular delivery partner
 test <- filter(all_projects_tidied, extending_org == "Bill & Melinda Gates Foundation")
 
 # Look for a particular award (from keyword in title)
 test <- filter(all_projects_tidied, str_detect(title, "under-five"))
 
+# Test country unknown exclusion logic
+test1 <- filter(all_projects_final, id == "GB-CHC-209131-A05500")
+test2 <- filter(all_projects_tidied, id == "GB-CHC-209131-A05500")
 
+test1 <- filter(all_projects_final, id == "GB-GOV-3-Chevening-Scholarships-SI")
+test2 <- filter(all_projects_tidied, id == "GB-GOV-3-Chevening-Scholarships-SI")
 
+test2 <- filter(duplicate_country_projects, str_detect(id, "GB-GOV-7-MOHC-001"))
+test3 <- filter(all_projects_final, str_detect(Funder, "Rural"))
+test4 <- filter(all_projects_tidied, str_detect(Funder, "Rural"))
 
+test <- filter(all_projects_split_country, str_detect(id, "GCRFNGR6"))
+test <- filter(all_projects_tidied, id == "GCRFNGR6\1548")
+test <- filter(all_projects_tidied, str_detect(title, "(round 4)"))
 
 
 

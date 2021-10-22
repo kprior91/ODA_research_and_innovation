@@ -159,6 +159,9 @@ ukri_projects_final <- ukri_projects_final %>%
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 # ukri_projects_final <- readRDS("Outputs/ukri_projects_final.rds") 
 
+rm(data)
+rm(n)
+rm(id)
 rm(missing_awards)
 rm(ukri_gcrf_newton_ids)
 rm(ukri_projects_by_fund)
@@ -235,6 +238,8 @@ nihr_projects_final <- nihr_projects_final %>%
   mutate(link = paste0("https://fundingawards.nihr.ac.uk/award/", id))
 
 rm(nihr_projects)
+rm(request)
+rm(response)
 
 # 3) Extract IATI projects ------------------------------------------------
 
@@ -299,9 +304,8 @@ iati_projects_final <- iati_projects_final %>%
   mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
 
 # Clean up
-rm(request)
-rm(response)
 rm(iati_activity_list)
+rm(partner_iati_list)
 rm(iati_projects)
 
 # 4) Extract Wellcome projects ------------------------------------------------
@@ -406,6 +410,10 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
 saveRDS(collated_spreadsheet_data, file = "Outputs/collated_spreadsheet_data.rds")
 # collated_spreadsheet_data <- readRDS("Outputs/collated_spreadsheet_data.rds") 
 
+rm(partner_spreadsheet_data)
+rm(data_list)
+rm(file_list)
+
 
 # 6) BEIS RODA data (spreadsheet)
 
@@ -414,8 +422,6 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
   rename(id = `Extending organisation - award ID`,
          abstract = `Award description`,
          title = `Award title`,
-         start_date = `Start date`,
-         end_date = `End date`,
          amount = `Award amount (£)`,
          recipient_country = `Beneficiary country`,
          extending_org = `Extending organisation - name`,
@@ -426,8 +432,8 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          iati_id = `Funder programme - IATI ID`,
          link = `Data source`
   ) %>% 
-  mutate(start_date = as.character(start_date),
-         end_date = as.character(end_date),
+  mutate(start_date = as.character(as.Date(`Start date`, "%d %B %Y")),
+         end_date = as.character(as.Date(`End date`, "%d %B %Y")),
          currency = coalesce(Currency, "GDP"),
          status = if_else(`Status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
                           if_else(`Status` %in% c("Completed"), "Closed", 
@@ -437,7 +443,11 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          subject = "",
          last_updated = quarter_end_date
   ) %>% 
-  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`,  -Status)
+    # suppress display of end dates that have passed
+  mutate(end_date = if_else(Sys.Date() <= end_date, end_date, "")) %>%
+    # remove unecessary variables
+  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`,  -Status,
+         -`Start date`, -`End date`)
 
 
 roda_extract_newton_final <- roda_extract_newton %>% 
@@ -455,16 +465,18 @@ roda_extract_newton_final <- roda_extract_newton %>%
          partner_org_country = "",
          iati_id = "",
          link = "",
-         start_date = as.character(coalesce(`Actual start date`, `Planned start date`)),
-         end_date = as.character(coalesce(`Actual end date`, `Planned end date`)),
+         start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
+         end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          currency = "GDP",
          period_start = "",
          period_end = "",
          subject = "",
-         last_updated = quarter_end_date
-  ) %>% 
+         last_updated = quarter_end_date) %>% 
   mutate(status = if_else(!is.na(end_date),
-                        if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown")) %>% 
+                        if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown")) %>%
+  # suppress display of end dates that have passed
+  mutate(end_date = if_else(Sys.Date() <= end_date, end_date, "")) %>%
+  
   select(-`Delivery partner`, -`Recipient region`, -`Planned start date`,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
 
@@ -472,7 +484,7 @@ rm(roda_extract_gcrf)
 rm(roda_extract_newton)
 
 
-# 7) Join 5 sources together ----------------------------------------------
+# 7) Join funder datasets together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
@@ -484,8 +496,9 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 # all_projects <- readRDS("Outputs/all_projects.rds") 
 
 
-# 7) CHECKING ----
+# 8) CHECKING ----
 test1 <- filter(all_projects, str_detect(extending_org, "NIHR"))
 test2 <- filter(all_projects, str_detect(id, "MR/N006267/1"))
+test3 <- filter(all_projects, str_detect(Funder, "Rural"))
 
 
