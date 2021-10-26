@@ -18,13 +18,19 @@ fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
 transactions_dataset <- data.frame()
 
 for (id in fcdo_ri_programmes$iati_identifier) {
+  new_rows <- 0
+  page <- 1
   
-  print(id)
-  path <- paste0("https://iati.cloud/api/transactions/?provider_activity=", id, "&format=json&page_size=20")
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  new_data <- response$results 
+  while (page == 1 | new_rows > 0) {
+  
+    print(paste0(id, "-", page))
+    x <- nrow(transactions_dataset)
+    
+    path <- paste0("https://iati.cloud/api/transactions/?provider_activity=", id, "&format=json&page_size=20&page=", page)
+    request <- GET(url = path)
+    response <- content(request, as = "text", encoding = "UTF-8")
+    response <- fromJSON(response, flatten = TRUE) 
+    new_data <- response$results 
   
   if (length(new_data) > 0) {
     new_data <- new_data %>% 
@@ -33,6 +39,11 @@ for (id in fcdo_ri_programmes$iati_identifier) {
   }
   
   transactions_dataset <- rbind(transactions_dataset, new_data)
+  
+  page <- page + 1
+  y <- nrow(transactions_dataset)
+  new_rows = y - x
+  }
 }
 
 rm(request)
