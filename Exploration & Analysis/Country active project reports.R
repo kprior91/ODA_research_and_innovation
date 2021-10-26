@@ -14,7 +14,7 @@ all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds")
 
 ### 2) Output reports for each country ----
 
-all_output_list <- list()
+wb <- openxlsx::createWorkbook()
 
 for(i in 1:length(country_list)) {
 
@@ -37,7 +37,8 @@ for(i in 1:length(country_list)) {
                Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
                Funder == "Department of Health and Social Care" ~ "DHSC",
                Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-             )) %>% 
+             ),
+             link = coalesce(link, "https://devtracker.fcdo.gov.uk")) %>% 
       select(Funder, Fund, Title = title, Start, End, Description = abstract,
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
              `Web Link` = link) %>% 
@@ -64,35 +65,27 @@ for(i in 1:length(country_list)) {
       slice(1)
   
     # Add country dataset to output list
-    all_output_list[[i]] <- output_report
-    names(all_output_list)[i] <- country_list[i]
-
+    openxlsx::addWorksheet(wb, sheetName = country_list[i])
+    openxlsx::writeData(wb, sheet = i, x = output_report)
+    
+    # Identify titles and hyperlinks
+    hyperlinks <- output_report$`Web Link`
+    names(hyperlinks) <- output_report$Title
+    class(hyperlinks) <- "hyperlink"
+    
+    # Write hyperlinks
+    writeData(wb, sheet = i, x = hyperlinks, startRow = 2, startCol = 3, colNames = FALSE)
+    
+    # Set column widths
+    setColWidths(wb, sheet = i, cols = 1:8, widths = c(8,25,40,6,6,40,30,30))
+    
 }
-
-# Write list to Excel
-write_xlsx(all_output_list, path = "Outputs//East Africa ODA programmes - Oct21.xlsx")
-
-
-### 3) Format workbook ----
-
-# Reload Excel workbook
-wb <- openxlsx::loadWorkbook("Outputs//East Africa ODA programmes - Oct21.xlsx")
-
-# Set column widths
-setColWidths(wb, sheet = 1, cols = 1:3, widths = c(8, 20, 8))
-
-# Add hyperlinks
-
-  # For each sheet, identify column to turn into hyperlinks
-  x <- c("https://d-portal.org/ctrack.html#view=act&aid=XM-DAC-47015-12381_Windows1and2_CGIARFund_IRRI", 
-         "https://d-portal.org/ctrack.html#view=act&aid=GB-GOV-3-Chevening-Scholarships-BI")
-  names(x) <- c("Capital Purchase Plan (Genebank Conservation Module) (Windows 1 & 2)", 
-                "Chevening Scholarships in Burundi")
-  class(x) <- "hyperlink"
-  
-  # Write hyperlinks
-  writeData(xlsx_file, sheet = 1, x = x, startRow = 2, startCol = 3)
 
 # Resave Excel file
 saveWorkbook(wb, "Outputs//East Africa ODA programmes - Oct21.xlsx", overwrite = TRUE)
+
+
+
+
+
 

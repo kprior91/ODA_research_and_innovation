@@ -213,7 +213,7 @@ length(unique(all_projects_tidied$id))
 test <- filter(all_projects_tidied, extending_org == "Bill & Melinda Gates Foundation")
 
 # Look for a particular award (from keyword in title)
-test <- filter(all_projects_tidied, str_detect(title, "under-five"))
+test <- filter(all_projects_tidied, str_detect(extending_org, "Food"))
 
 # Test country unknown exclusion logic
 test1 <- filter(all_projects_final, id == "GB-CHC-209131-A05500")

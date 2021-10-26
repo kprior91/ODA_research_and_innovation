@@ -28,6 +28,9 @@ if (!("googlesheets4" %in% installed.packages())) {
 if (!("gargle" %in% installed.packages())) {
   install.packages("gargle")
 }
+if (!("openxlsx" %in% installed.packages())) {
+  install.packages("openxlsx")
+} # for adding hyperlinks and formatting to output Excel reports
 
 library(jsonlite)
 library(httr)
@@ -36,6 +39,7 @@ library(readxl)
 library(writexl)
 library(googlesheets4)
 library(gargle)
+library(openxlsx)
 
 
 ### Read in reference data ----
@@ -60,6 +64,9 @@ dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xl
 
 ### Input data ----
 
+# FCDO partner IATI activities (to add manually as not linked) 
+iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
+
 # UKRI non GCRF/Newton project IDs
 ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
 
@@ -78,6 +85,9 @@ roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
 
 # Function to extract IATI activity info from activity ID
 iati_activity_extract <- function(activity_id) {
+  
+  # Reformat ID if it contains spaces (for API)
+  activity_id <- str_replace_all(activity_id, " ", "%20")
   
   path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=other_identifier,reporting_org,location,default_flow_type,activity_date,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity&page_size=20")
   request <- GET(url = path)
@@ -122,8 +132,12 @@ org_activity_extract <- function(page, org_code) {
 
 
 # Function to extract transactions for a specified IATI activity ID
-transactions_extract <- function(iati_id, page, output_data) {
-  path <- paste0("https://iati.cloud/api/transactions/?iati_identifier=", iati_id, "&fields=value,transaction_date,description,currency,receiver_organisation&format=json&page_size=20&page=", page)
+transactions_extract <- function(activity_id, page, output_data) {
+  
+  # Reformat ID if it contains spaces (for API)
+  activity_id <- str_replace_all(activity_id, " ", "%20")
+  
+  path <- paste0("https://iati.cloud/api/transactions/?iati_identifier=", activity_id, "&fields=value,transaction_date,description,currency,receiver_organisation&format=json&page_size=20&page=", page)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
@@ -142,6 +156,9 @@ transactions_extract <- function(iati_id, page, output_data) {
 # Function to extract programme names from IATI
 
 extract_iati_activity_name <- function(activity_id) {
+  
+  # Reformat ID if it contains spaces (for API)
+  activity_id <- str_replace_all(activity_id, " ", "%20")
   
   path <- paste0("https://iati.cloud/api/activities/?iati_identifier=", activity_id, "&format=json&fields=title")
   request <- GET(url = path)

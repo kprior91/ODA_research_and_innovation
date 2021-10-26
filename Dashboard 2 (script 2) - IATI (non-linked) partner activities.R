@@ -3,22 +3,16 @@
 # Extract ODA research activities from public IATI data #
 # --------------------------------------------------------------- #
 
-### A) Activity extract by ID (manually identified) ---
+### A) Extract data on all partner activities from IATI Registry ----
 
-# 1) Read in partner activity IATI list 
-iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
-
-# 2) Combine with linked activities from script 1
+# Read in linked partner IATI activity info from script 1
 red_linked_activites <- readRDS(file = "Outputs/red_linked_activites.rds") %>% 
   rename(iati_id = linked_activity,
          funding_iati_id = programme_id)
 
+# Manually add on other (non-linked) partner activities from Excel
 iati_activity_ids <- iati_activity_ids %>% 
-  plyr::rbind.fill(red_linked_activites) %>% 
-  # replace spaces with %20 so that they don't cause errors
-  mutate(iati_id = str_replace_all(iati_id, " ", "%20"))
-
-# 3) Extract specified partner activities from IATI Registry 
+  plyr::rbind.fill(red_linked_activites)
 
 # Prepare results data frame and counters
 partner_activity_extract <- data.frame()
@@ -34,11 +28,10 @@ for (id in iati_activity_ids$iati_id) {
 
 # Save to Rdata file
 saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract.rds")
-# Restore the object
 # partner_activity_extract <- readRDS(file = "Outputs/partner_activity_extract.rds")
 
 
-### B) Activity extract for specific partner organisations
+### B) Activity extract for specific partner organisations ----
 
 # CGIAR, IDRC FCDO-funded activities 
 
@@ -469,6 +462,7 @@ activity_list <- activity_list %>%
 
 # Save to Rdata file
 saveRDS(activity_list, file = "Outputs/partner_activity_list.rds")
+# activity_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
 # Check funds, funders
 table(activity_list$fund)
@@ -478,3 +472,4 @@ table(activity_list$currency)
 # Check specific partner
 test1 <- filter(activity_list, str_detect(reporting_org, "Elrha"))
 
+test1 <- filter(activity_list, str_detect(reporting_org, "Food"))
