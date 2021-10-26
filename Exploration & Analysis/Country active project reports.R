@@ -1,56 +1,98 @@
 # Script to output Excel sheet of active projects in a country #
 
+### 1) Set up ---
+
 # Define countries for reports
-country_list <- c("Kenya", "Uganda")
+country_list <- c("Burundi", "Comoros", "Djibouti", "Ethiopia", "Eritrea", "Kenya",
+                  "Madagascar", "Malawi", "Mauritius", "Mozambique", "Réunion", "Rwanda", 
+                  "Seychelles", "Somalia", "Somaliland", "Tanzania", "Uganda", "Zambia", "Zimbabwe")
 
 # Read in datasets
 all_projects <- readRDS("Outputs/all_projects.rds") 
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
-# Extract project data for each country
-country_project_ids <- all_projects_tidied %>% 
-  filter(Country == country_list[1]) %>% 
-  select(id) %>% 
-  unique()
 
-country_project_data <- all_projects %>% 
-  filter(id %in% country_project_ids$id)
+### 2) Output reports for each country ----
 
-# Prepare output report fields
-output_report <- country_project_data %>% 
-  mutate(Start = format(as.Date(start_date), format = "%Y"),
-         End = format(as.Date(end_date), format = "%Y"),
-         Funder = case_when(
-           Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
-           Funder == "Department of Health and Social Care" ~ "DHSC",
-           Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-         )) %>% 
-  select(Funder, Fund, Title = title, Start, End, Description = abstract,
-         `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name) %>% 
-  group_by(Title, Funder) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  unique()
+all_output_list <- list()
 
-# Summarise funders on co-funded projects
-co_funded_projects <- output_report %>% 
-  group_by(Title) %>% 
-  summarise(n = n(),
-            comb_funder = paste(coalesce(Funder, ""), collapse = ", ")) %>% 
-  filter(n > 1) %>% 
-  select(-n)
+for(i in 1:length(country_list)) {
 
-output_report <- output_report %>% 
-  left_join(co_funded_projects, by = "Title") %>% 
-  mutate(Funder = coalesce(comb_funder, Funder)) %>% 
-  group_by(Title) %>% 
-  slice(1)
+    print(paste0(i, " - ", country_list[i]))
   
+    # Extract project data for selected country
+    country_project_ids <- all_projects_tidied %>% 
+      filter(Country == country_list[i]) %>% 
+      select(id) %>% 
+      unique()
+    
+    country_project_data <- all_projects %>% 
+      filter(id %in% country_project_ids$id)
+    
+    # Prepare output report fields
+    output_report <- country_project_data %>% 
+      mutate(Start = format(as.Date(start_date), format = "%Y"),
+             End = format(as.Date(end_date), format = "%Y"),
+             Funder = case_when(
+               Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
+               Funder == "Department of Health and Social Care" ~ "DHSC",
+               Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
+             )) %>% 
+      select(Funder, Fund, Title = title, Start, End, Description = abstract,
+             `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
+             `Web Link` = link) %>% 
+      group_by(Title, Funder) %>% 
+      slice(1) %>% 
+      ungroup() %>% 
+      unique()
+    
+    # Summarise funders on co-funded projects
+    co_funded_projects <- output_report %>% 
+      group_by(Title) %>% 
+      summarise(n = n(),
+                comb_funder = paste(coalesce(Funder, ""), collapse = ", ")) %>% 
+      filter(n > 1) %>% 
+      select(-n)
+    
+    # Add summarised funders to main report
+    output_report <- output_report %>% 
+      left_join(co_funded_projects, by = "Title") %>% 
+      mutate(Funder = coalesce(comb_funder, Funder)) %>% 
+      select(-comb_funder) %>% 
+      group_by(Title) %>% 
+      # Keep one row per project title
+      slice(1)
+  
+    # Add country dataset to output list
+    all_output_list[[i]] <- output_report
+    names(all_output_list)[i] <- country_list[i]
+
+}
+
+# Write list to Excel
+write_xlsx(all_output_list, path = "Outputs//East Africa ODA programmes - Oct21.xlsx")
 
 
-all_outputs <- list(Kenya = output_report, 
-                    Uganda = output_report)
+### 3) Format workbook ----
 
-# Write to Excel
+# Reload Excel workbook
+wb <- openxlsx::loadWorkbook("Outputs//East Africa ODA programmes - Oct21.xlsx")
 
-write_xlsx(all_outputs, path = "Outputs//Active ODA programmes - Oct21.xlsx")
+# Set column widths
+setColWidths(wb, sheet = 1, cols = 1:3, widths = c(8, 20, 8))
+
+# Add hyperlinks
+
+  # For each sheet, identify column to turn into hyperlinks
+  x <- c("https://d-portal.org/ctrack.html#view=act&aid=XM-DAC-47015-12381_Windows1and2_CGIARFund_IRRI", 
+         "https://d-portal.org/ctrack.html#view=act&aid=GB-GOV-3-Chevening-Scholarships-BI")
+  names(x) <- c("Capital Purchase Plan (Genebank Conservation Module) (Windows 1 & 2)", 
+                "Chevening Scholarships in Burundi")
+  class(x) <- "hyperlink"
+  
+  # Write hyperlinks
+  writeData(xlsx_file, sheet = 1, x = x, startRow = 2, startCol = 3)
+
+# Resave Excel file
+saveWorkbook(wb, "Outputs//East Africa ODA programmes - Oct21.xlsx", overwrite = TRUE)
+

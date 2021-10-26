@@ -500,7 +500,7 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 
 # 8) CHECKING ----
 test1 <- filter(all_projects, str_detect(extending_org, "NIHR"))
-test2 <- filter(all_projects, str_detect(id, "MR/N006267/1"))
+test2 <- filter(all_projects, str_detect(id, "GB-1-202568-1"))
 test3 <- filter(all_projects, str_detect(Funder, "Rural"))
 
 # Example UKRI project funded by BEIS GCRF, FCDO and DHSC
