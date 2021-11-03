@@ -266,9 +266,9 @@ activity_list_unnest_4 <- partner_activity_comb %>%
   unnest(cols = narrative,
          keep_empty = TRUE) %>% 
   filter(role.name == "Implementing") %>% 
-  filter(!(text %in% c("Centre de recherches pour le développement international",
-                       "Centro Internacional de Investigaciones para el Desarrollo"))) %>% 
-  #filter(lang.name == "English") %>% 
+  # filter(!(text %in% c("Centre de recherches pour le développement international",
+  #                      "Centro Internacional de Investigaciones para el Desarrollo"))) %>% 
+  filter(lang.name == "English") %>% 
   select(-lang.code, -lang.name) %>% 
   unique() %>% 
   # Add simple country locations based on IATI references
@@ -285,49 +285,43 @@ activity_list_unnest_4 <- partner_activity_comb %>%
 
 # Match institutions to countries with GRID database
 
-country_match <- activity_list_unnest_4 %>% 
+country_match_1 <- activity_list_unnest_4 %>% 
   left_join(grid_institutes, by = c("text" = "name")) %>% 
   left_join(grid_addresses, by = "grid_id") %>% 
   group_by(iati_identifier, text, ref) %>% 
-  top_n(1) %>% 
+  slice(1) %>% 
+  ungroup() %>% 
   mutate(partner_country = if_else(text == "International Development Research Centre", "Canada", 
                                    if_else(text == "CABI", "United Kingdom", partner_country))) %>% 
   mutate(partner_country = coalesce(partner_country, country)) %>% 
-  select(iati_identifier, text, ref, partner_country, grid_id) %>% 
-  ungroup()
+  select(iati_identifier, partner_country) %>% 
+  unique()
 
 # Extract countries mentioned in the partner organisation name
 countries <- countrycode::codelist$country.name.en
 countries_string <- paste0(countries, collapse = "|")
 
 country_match_2 <- activity_list_unnest_4 %>% 
-  mutate(countries = str_extract_all(text, countries_string)) %>% 
-  unnest(cols = countries) %>% 
-  unique() %>% 
-  group_by(iati_identifier) %>% 
-  summarise(countries = paste(coalesce(countries, ""), collapse = ", "))
-
-activity_list_unnest_4_countries <- country_match %>% 
+  mutate(partner_country = str_extract_all(text, countries_string)) %>% 
+  unnest(cols = partner_country) %>% 
   select(iati_identifier, partner_country) %>% 
-  unique() %>% 
-  filter(!is.na(partner_country)) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(partner_country = paste(partner_country, collapse = ", "))
+  unique() 
 
+# Combine and dedup
+country_match <- rbind(country_match_1, country_match_2) %>% 
+  unique() %>% 
+  group_by(iati_identifier) %>% 
+  filter(!is.na(partner_country)) %>% 
+  summarise(partner_country = paste(coalesce(partner_country, ""), collapse = ", "))
+
+# Join to partner list
 activity_list_unnest_4_partners <- activity_list_unnest_4 %>% 
   select(iati_identifier, text, role.name, ref) %>% 
   unique() %>% 
   filter(!is.na(text)) %>% 
   group_by(iati_identifier) %>% 
-  summarise(partner = paste(coalesce(text, ""), collapse = ", "),
-            partner_role = paste(coalesce(role.name, ""), collapse = ", "),
-            partner_ref = paste(coalesce(ref, ""), collapse = ", ")) 
-
-activity_list_unnest_4 <- activity_list_unnest_4_partners %>% 
-  left_join(activity_list_unnest_4_countries, by = "iati_identifier") %>% 
-  left_join(country_match_2, by = "iati_identifier") %>% 
-  mutate(partner_country = coalesce(partner_country, countries)) %>% 
-  select(-countries)
+  summarise(partner = paste(coalesce(text, ""), collapse = ", ")) %>% 
+  left_join(country_match, by = "iati_identifier") 
 
 
 # 4) Unlist extending organisations
@@ -411,7 +405,7 @@ activity_list <- activity_list_base %>%
   left_join(activity_list_unnest_1, by = "iati_identifier") %>%
   left_join(activity_list_unnest_2_comp, by = "iati_identifier") %>%
   left_join(activity_list_unnest_3, by = "iati_identifier") %>%
-  left_join(activity_list_unnest_4, by = "iati_identifier") %>% 
+  left_join(activity_list_unnest_4_partners, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_5, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_6, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_7_dedup, by = "iati_identifier") %>% 
@@ -430,7 +424,7 @@ activity_list <- activity_list %>%
          hierarchy, activity_status, flow_type, fcdo_activity_id,
          activity_title, activity_description, start_date, end_date,
          recipient_country, sector_code, sector_name,
-         partner, partner_role, partner_ref, partner_country, gov_funder, 
+         partner, partner_country, gov_funder, 
          extending_org, fund,
          amount, period_start, period_end, currency) %>% 
   unique() %>% 
