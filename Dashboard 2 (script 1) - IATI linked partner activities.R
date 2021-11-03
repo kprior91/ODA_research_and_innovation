@@ -9,7 +9,7 @@
 
 # Read in list of tagged RI RED components
 
-fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
+ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities.rds")
 
 
 ###
@@ -17,7 +17,7 @@ fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
 
 transactions_dataset <- data.frame()
 
-for (id in fcdo_ri_programmes$iati_identifier) {
+for (id in ri_iati_activities$iati_identifier) {
   new_rows <- 0
   page <- 1
   

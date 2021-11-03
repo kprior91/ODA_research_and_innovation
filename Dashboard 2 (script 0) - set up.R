@@ -83,6 +83,23 @@ roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
 
 ### IATI ###
 
+# Function to extract 5-digit OECD sector codes
+
+sector_extract <- function(page, sector_list) {
+  path <- paste0("https://iati.cloud/api/sectors/?fields=category,url,name,code&format=json&page_size=20&page=", page)
+  request <- GET(url = path)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  
+  # Condition to check when 5-digit codes stop being returned
+  if(!("category" %in% names(response$results))) {
+    sector_list <- rbind(sector_list, response$results)
+  } else {
+    sector_list <- sector_list
+  }
+  return(sector_list)
+}
+
 # Function to extract IATI activity info from activity ID
 iati_activity_extract <- function(activity_id) {
   
@@ -111,7 +128,7 @@ iati_activity_extract <- function(activity_id) {
 # org_code <- "XM-DAC-47015"
 # page <- 77
 
-org_activity_extract <- function(page, org_code) {
+org_activity_extract <- function(page, org_code, org_activity_list) {
   path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")

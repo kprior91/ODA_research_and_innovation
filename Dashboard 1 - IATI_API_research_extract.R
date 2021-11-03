@@ -1,42 +1,25 @@
 # --------------------------------------------------------------- #
-# Extract ODA research activities from public IATI data #
+# Extract ODA research activities from UK gov funder IATI data #
 # --------------------------------------------------------------- #
 
 # 1) Extract list of research sector codes from IATI -----------------------------
 
-# Function to extract 5-digit sector codes
-
-sector_extract <- function(page) {
-  path <- paste0("https://iati.cloud/api/sectors/?fields=category,url,name,code&format=json&page_size=20&page=", page)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  
-  # Condition to check when 5-digit codes stop being returned
-  if(!("category" %in% names(response$results))) {
-    sector_list <- rbind(sector_list_final, response$results)
-  } else {
-    sector_list <- sector_list_final
-  }
-  return(sector_list)
-}
-
 # Prepare results data frame and counters
-sector_list_final <- data.frame()
+sector_list <- data.frame()
 new_rows <- 0
 page <- 1
 
 # Run extraction, stopping when no new sector codes returned
 while (page == 1 | new_rows > 0) {
-  x <- nrow(sector_list_final)
-  sector_list_final <- sector_extract(page)
+  x <- nrow(sector_list)
+  sector_list <- sector_extract(page, sector_list)
   page <- page + 1
-  y <- nrow(sector_list_final)
+  y <- nrow(sector_list)
   new_rows = y - x
 }
 
 # Keep research codes only (11)
-sector_list_research <- sector_list_final %>% 
+sector_list_research <- sector_list %>% 
   filter(str_detect(str_to_lower(name), "research") | 
            str_detect(str_to_lower(name), "higher education") |
            str_detect(str_to_lower(name), "information and communication technology"))
@@ -46,26 +29,6 @@ sector_list_research <- sector_list_final %>%
 
 # Set strings for API URL
 organisation_codes <- c("GB-GOV-1", "GB-GOV-7", "GB-GOV-10", "GB-GOV-13", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52")
-
-# Function to extract all UK government department activities
-uk_gov_extract <- function(page, org_code) {
-  path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
-  request <- GET(url = path)
-  response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
-  new_data <- response$results
-  
-  # Ensure "default flow type" field exists for joining datasets
-  if("default_flow_type.name" %in% names(new_data)) {
-     new_data <- new_data %>% 
-                    mutate(default_flow_type = default_flow_type.name) %>% 
-                    select(-default_flow_type.name, -default_flow_type.code)
-  } 
-  
-  results <- rbind(uk_gov_list_final, new_data)
-  
-  return(results)
-}
 
 # Prepare results data frame and counters
 uk_gov_list_final <- data.frame()
@@ -79,7 +42,7 @@ for (org in organisation_codes) {
   while (page == 1 | new_rows > 0) {
     print(paste0(org, "-", page))
     x <- nrow(uk_gov_list_final)
-    uk_gov_list_final <- uk_gov_extract(page, org)
+    uk_gov_list_final <- org_activity_extract(page, org, uk_gov_list_final)
     page <- page + 1
     y <- nrow(uk_gov_list_final)
     new_rows = y - x
@@ -87,7 +50,6 @@ for (org in organisation_codes) {
 }
 
 saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final.rds")
-# Restore the object
 # uk_gov_list_final <- readRDS(file = "Outputs/uk_gov_list_final.rds")
 
 
@@ -101,14 +63,13 @@ uk_gov_ri_programmes <- uk_gov_list_final %>%
   select(-narrative, -vocabulary_uri, -vocabulary.code, -vocabulary.name)
 
 # Save list of tagged research & innovation programmes
-fcdo_ri_programmes <- uk_gov_ri_programmes %>% 
+ri_iati_activities <- uk_gov_ri_programmes %>% 
   filter(code == "RI") %>% 
   select(iati_identifier) %>% 
   unique()
 
-saveRDS(fcdo_ri_programmes, file = "Outputs/fcdo_ri_programmes.rds")
-# Restore the object
-# fcdo_ri_programmes <- readRDS(file = "Outputs/fcdo_ri_programmes.rds")
+saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
+# ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities.rds")
 
 
 # Filter out non-research programmes  
@@ -146,19 +107,16 @@ gov_list_unnest_1 <- uk_gov_list_filtered %>%
          keep_empty = TRUE) %>%     
   unique()
 
-
-# Fix records with multiple "General" descriptions
-
-activities_to_fix <- gov_list_unnest_1 %>% 
-  group_by(iati_identifier, activity_title, type.name) %>% 
-  summarise(no_descriptions = n()) %>% 
-  filter(no_descriptions > 1)
-
-
-gov_list_unnest_1 <- gov_list_unnest_1 %>% 
-  group_by(iati_identifier, activity_title, type.name) %>% 
-  summarise(text = paste(coalesce(text, ""), collapse = "; ")) %>% 
-  spread(key = type.name, value = text)
+    # Fix records with multiple "General" descriptions
+    activities_to_fix <- gov_list_unnest_1 %>% 
+      group_by(iati_identifier, activity_title, type.name) %>% 
+      summarise(no_descriptions = n()) %>% 
+      filter(no_descriptions > 1)
+    
+    gov_list_unnest_1 <- gov_list_unnest_1 %>% 
+      group_by(iati_identifier, activity_title, type.name) %>% 
+      summarise(text = paste(coalesce(text, ""), collapse = "; ")) %>% 
+      spread(key = type.name, value = text)
 
 
 # B) Unlist recipient countries
@@ -184,18 +142,18 @@ gov_list_unnest_3 <- uk_gov_list_filtered %>%
   group_by(iati_identifier) %>%
   unique()
 
-# Extract research sector percentages
-sector_percentages <- gov_list_unnest_3 %>% 
-  filter(!is.na(percentage), percentage != 100) %>% 
-  select(iati_identifier, percentage) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(research_pc = sum(percentage))
-
-# Summarise all sector descriptions for each activity
-gov_list_unnest_3 <- gov_list_unnest_3 %>% 
-  summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
-            sector_name = paste(coalesce(sector.name, ""), collapse = ", "),
-            sector_percentage = paste(coalesce(percentage, 100), collapse = ", "))
+    # Extract research sector percentages
+    sector_percentages <- gov_list_unnest_3 %>% 
+      filter(!is.na(percentage), percentage != 100) %>% 
+      select(iati_identifier, percentage) %>% 
+      group_by(iati_identifier) %>% 
+      summarise(research_pc = sum(percentage))
+    
+    # Summarise all sector descriptions for each activity
+    gov_list_unnest_3 <- gov_list_unnest_3 %>% 
+      summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
+                sector_name = paste(coalesce(sector.name, ""), collapse = ", "),
+                sector_percentage = paste(coalesce(percentage, 100), collapse = ", "))
 
 
 # D) Unlist implementing organisations
@@ -217,24 +175,24 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
     str_detect(ref, "IN-") ~ "India"
   ))
 
-gov_list_unnest_4_countries <- gov_list_unnest_4 %>% 
-  select(iati_identifier, partner_country) %>% 
-  unique() %>% 
-  filter(!is.na(partner_country)) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(partner_country = paste(partner_country, collapse = ", "))
-
-gov_list_unnest_4_partners <- gov_list_unnest_4 %>% 
-  select(iati_identifier, text, role.name, ref) %>% 
-  unique() %>% 
-  filter(!is.na(text)) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(partner = paste(coalesce(text, ""), collapse = ", "),
-            partner_role = paste(coalesce(role.name, ""), collapse = ", "),
-            partner_ref = paste(coalesce(ref, ""), collapse = ", ")) 
-
-gov_list_unnest_4 <- gov_list_unnest_4_partners %>% 
-  left_join(gov_list_unnest_4_countries, by = "iati_identifier")
+    gov_list_unnest_4_countries <- gov_list_unnest_4 %>% 
+      select(iati_identifier, partner_country) %>% 
+      unique() %>% 
+      filter(!is.na(partner_country)) %>% 
+      group_by(iati_identifier) %>% 
+      summarise(partner_country = paste(partner_country, collapse = ", "))
+    
+    gov_list_unnest_4_partners <- gov_list_unnest_4 %>% 
+      select(iati_identifier, text, role.name, ref) %>% 
+      unique() %>% 
+      filter(!is.na(text)) %>% 
+      group_by(iati_identifier) %>% 
+      summarise(partner = paste(coalesce(text, ""), collapse = ", "),
+                partner_role = paste(coalesce(role.name, ""), collapse = ", "),
+                partner_ref = paste(coalesce(ref, ""), collapse = ", ")) 
+    
+    gov_list_unnest_4 <- gov_list_unnest_4_partners %>% 
+      left_join(gov_list_unnest_4_countries, by = "iati_identifier")
 
 
 # E) Unlist extending organisations
@@ -279,48 +237,30 @@ gov_list_unnest_7 <- uk_gov_list_filtered %>%
   filter(!is.na(budget_status)) %>% 
   ungroup()
 
-# Find activities with multiple budgets
-multiple_budgets <- gov_list_unnest_7 %>% 
-  group_by(iati_identifier, period_start, period_end) %>% 
-  summarise(count = n()) %>% 
-  filter (count > 1)
+    # Find activities with multiple budgets
+    multiple_budgets <- gov_list_unnest_7 %>% 
+      group_by(iati_identifier, period_start, period_end) %>% 
+      summarise(count = n()) %>% 
+      filter (count > 1)
+    
+    # Keep only the committed budget in these cases
+    gov_list_unnest_7_dedup <- gov_list_unnest_7 %>% 
+      filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
+             budget_status == "Committed") %>% 
+      group_by(iati_identifier, currency) %>% 
+      summarise(period_start = min(period_start),
+                period_end = max(period_end),
+                amount = sum(amount))
+    
+    # Join on research percentages
+    gov_list_unnest_7_dedup <- gov_list_unnest_7_dedup %>% 
+      left_join(sector_percentages, by = "iati_identifier") %>% 
+      mutate(research_pc = coalesce(research_pc, 100)) %>% 
+      mutate(adjusted_amount = (research_pc/100)*amount)
 
-# Keep only the committed budget in these cases
-gov_list_unnest_7_dedup <- gov_list_unnest_7 %>% 
-  filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
-         budget_status == "Committed") %>% 
-  group_by(iati_identifier, currency) %>% 
-  summarise(period_start = min(period_start),
-            period_end = max(period_end),
-            amount = sum(amount))
 
-# Join on research percentages
-gov_list_unnest_7_dedup <- gov_list_unnest_7_dedup %>% 
-  left_join(sector_percentages, by = "iati_identifier") %>% 
-  mutate(research_pc = coalesce(research_pc, 100)) %>% 
-  mutate(adjusted_amount = (research_pc/100)*amount)
-
-
-# H) Unlist and aggregate policy markers
+# H) Unlist start/end dates
 gov_list_unnest_8 <- uk_gov_list_filtered %>% 
-  unnest(cols = policy_marker,
-         keep_empty = TRUE) %>% 
-  select(iati_identifier, 
-         policy_marker_code = policy_marker.code, 
-         policy_marker_name = policy_marker.name, 
-         policy_significance = significance.name) %>% 
-  filter(!is.na(policy_marker_name) & policy_significance != "not targeted") %>% 
-  mutate(climate_marker = if_else(str_detect(policy_marker_name, "Climate Change"), policy_significance, "")) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(policy_marker_code = paste(coalesce(policy_marker_code, ""), collapse = ", "),
-            policy_marker_name = paste(coalesce(policy_marker_name, ""), collapse = ", "),
-            policy_significance = paste(coalesce(policy_significance, ""), collapse = ", "),
-            climate_focus = paste(coalesce(climate_marker, ""), collapse = ", ")) %>% 
-  mutate(climate_focus = if_else(str_detect(climate_focus, "significant"), "Significant",
-                                 if_else(str_detect(climate_focus, "principal"), "Principal", "")))
-
-# I) Unlist start/end dates
-gov_list_unnest_9 <- uk_gov_list_filtered %>% 
   unnest(cols = activity_date,
          keep_empty = TRUE) %>% 
   select(iati_identifier, 
@@ -343,7 +283,6 @@ gov_list <- gov_list_base %>%
   left_join(gov_list_unnest_6, by = "iati_identifier") %>% 
   left_join(gov_list_unnest_7_dedup, by = "iati_identifier") %>% 
   left_join(gov_list_unnest_8, by = "iati_identifier") %>% 
-  left_join(gov_list_unnest_9, by = "iati_identifier") %>% 
   filter(reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10", "GB-GOV-13") & !str_detect(iati_identifier, "GB-GOV-3") |
            !is.na(sector_name))   # removes non-R&I activities for Defra, ex-FCO (GB-GOV-3) and Prosperity Fund
 
@@ -352,8 +291,7 @@ gov_list <- gov_list %>%
   select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
          hierarchy, activity_status, flow_type, activity_id,
          activity_title, General, Objectives, country_code, start_date, end_date,
-         country_name, country_percentage, sector_code, sector_name,
-         policy_marker_code, policy_marker_name, policy_significance, climate_focus,
+         all_countries = country_name, country_percentage, sector_code, sector_name,
          sector_percentage, partner, partner_role, partner_ref, partner_country, extending_org,
          amount, period_start, period_end, currency) %>% 
   unique() %>% 
@@ -384,27 +322,6 @@ gov_list <- gov_list %>%
   mutate(reporting_org = str_replace_all(reporting_org, "UK - ", ""))
 
 
-# Extract countries mentioned in abstract or title
-countries <- countrycode::codelist$country.name.en
-countries_string <- paste0(countries, collapse = "|")
-
-countries_in_description <- gov_list %>% 
-  mutate(text = paste0(activity_title, " ", General)) %>% 
-  select(iati_identifier, text) %>% 
-  mutate(countries = str_extract_all(text, countries_string)) %>% 
-  unnest(cols = countries) %>% 
-  unique() %>% 
-  group_by(iati_identifier) %>% 
-  summarise(countries = paste(coalesce(countries, ""), collapse = ", "))
-
-
-gov_list <- gov_list %>% 
-  left_join(countries_in_description, by = "iati_identifier") %>% 
-  mutate(all_countries = country_name) 
-# mutate(all_countries = paste0(country_name, ", ", countries)) # this combines IATI country with those taken from description for searchability in Power BI
-
-
-
 # 4) Account for parent-child hierarchies -----------
 # Extract detail at child activity level (if available) and ensure
 # spend is not being double-counted e.g. for DFID
@@ -418,13 +335,12 @@ gov_list_final <- gov_list %>%
             (reporting_org_ref %in% c("GB-GOV-10") & str_detect(iati_identifier, "GAMRIF|UKVN")) |
             (reporting_org_ref %in% c("GB-GOV-10") & fund == "Other" & !is.na(amount))), # DHSC non-NIHR spend
          !(hierarchy == 1 & str_detect(iati_identifier, "AMS|BA")), # BEIS DP activities
-         flow_type == "ODA") %>% 
-  select(-climate_focus) 
+         flow_type == "ODA")
 
 # Join on FCDO programme descriptions at component level
 gov_list_final <- gov_list_final %>% 
   left_join(select(gov_list, 
-                   iati_identifier, climate_focus, 
+                   iati_identifier, 
                    programme_title = activity_title,
                    programme_description = General), 
             by = c("programme_id" = "iati_identifier")) %>% 
@@ -447,7 +363,7 @@ unique(gov_list_final$reporting_org)
 saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 # gov_list_final <- readRDS("Outputs/gov_list_final.rds") 
 
-# Save to Excel
+# Save to Excel (for Power BI dashboard)
 write_xlsx(x = list(`IATI research` = gov_list_final), 
            path = "IATI research activities.xlsx")
 

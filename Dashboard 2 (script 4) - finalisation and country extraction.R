@@ -107,7 +107,8 @@ rm(duplicate_country_projects)
 # Tidy fund and funder labelling
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(Fund = if_else(str_detect(Fund, "FCDO Research & Innovation|FCDO fully"), "FCDO Research - Programmes", Fund),
-         Fund = if_else(str_detect(Fund, "FCDO partially"), "FCDO Research - Partnerships", Fund))
+         Fund = if_else(str_detect(Fund, "FCDO partially"), "FCDO Research - Partnerships", Fund),
+         currency = if_else(currency == "GDP", "GBP", currency))
 
 # Add FCDO programme ID to dataset
 all_projects_tidied <- all_projects_tidied %>% 
@@ -168,6 +169,11 @@ all_projects_tidied <- all_projects_tidied %>%
   mutate(extending_org = if_else(extending_org == "GB-COH-877338", 
                                  "Institute of Development Studies", extending_org))
 
+# Remove WHO non-research/innovation activities
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(extending_org == "World Health Organization") |
+         str_detect(title, "research|innovation"))
+
 
 # 5) Check data ---------------------
 
@@ -177,7 +183,8 @@ table(all_projects_tidied$Fund)
 # check list of ODA R&I funders
 table(all_projects_tidied$Funder)
 
-
+# check list of ODA R&I funders
+table(all_projects_tidied$currency)
 
 # 6) Write data --------------------------------
 
@@ -232,4 +239,12 @@ test <- filter(all_projects_tidied, str_detect(title, "UMURINZI"))
 
 
 
+
+test <- all_projects_tidied %>% 
+  filter((str_detect(extending_org, "Academy") | str_detect(extending_org, "Society")),
+         Funder == "Department for Business, Energy and Industrial Strategy") %>% 
+  select(id, amount) %>% 
+  unique()
+
+sum(test$amount, na.rm = TRUE)
 

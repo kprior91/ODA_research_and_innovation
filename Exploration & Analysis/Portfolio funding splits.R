@@ -5,48 +5,45 @@
 ### 1) UKRI - GCRF/Newton ---
 ukri_gcrf_newton <- ukri_projects_final %>% 
   filter(Fund %in% c("Global Challenges Research Fund (GCRF)", "Newton Fund"),
-         status == "Active") 
-
-# check funder
-unique(ukri_gcrf_newton$Funder)
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 # Sum total award amounts
-sum(ukri_gcrf_newton$amount)
-length(unique(ukri_gcrf_newton$id))
+sum(ukri_gcrf_newton$amount, na.rm = TRUE)
 
 
 ### 2) UKRI - FCDO ---
 ukri_fcdo <- ukri_projects_final %>% 
   filter(Funder == "Foreign, Commonwealth and Development Office",
-         status == "Active") 
-
-# check fund
-unique(ukri_fcdo$Fund)
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 # Sum total award amounts
-sum(ukri_fcdo$amount)
-length(unique(ukri_fcdo$id))
+sum(ukri_fcdo$amount, na.rm = TRUE)
 
 
-### 3) FCDO Research & Evidence Division (non-UKRI)
+### 3) UKRI - DHSC ---
+ukri_dhsc <- ukri_projects_final %>% 
+  filter(Funder == "Department of Health and Social Care",
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
-# Use Power BI IATI dashboard
-# Status: Implementation
-# Fund: "FCDO Research"
-# Budget: £2.9 bn
+# Sum total award amounts
+sum(ukri_dhsc$amount, na.rm = TRUE)
 
-fcdo_non_ukri <- iati_activity_list %>% 
-  filter(fund == "FCDO Research & Evidence Division",
-         activity_status == "Implementation",
-         end_date >= Sys.Date())
 
-# check hierarchy (should be 2 = component only to avoid double-counting spend)
-unique(fcdo_non_ukri$hierarchy)
-# check no duplicate records
-test <- unique(fcdo_non_ukri$iati_identifier)
-length(test)
-# check budget status
-table(fcdo_non_ukri$budget_status)
+### 3) FCDO Research & Evidence Division (non-UKRI, Wellcome)
+
+fcdo_non_ukri <- all_projects_tidied %>% 
+  filter(Funder == "Foreign, Commonwealth and Development Office",
+         !(extending_org %in% c("AHRC", "BBSRC", "EPSRC", "ESRC", "Innovate UK", "MRC", "NERC", "STFC")), 
+         currency == "GBP"
+         ) %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(fcdo_non_ukri$amount, na.rm = TRUE)
 
@@ -68,63 +65,69 @@ sum(nihr_active$amount)
 
 ### DHSC GAMRIF and UK Vaccine Network
 
-# Use Power BI IATI dashboard
-# Status: Implementation
-# Funder: DHSC
-# Budget: 86 million
-
-ghs_awards <- all_projects %>% 
+ghs_awards <- all_projects_tidied %>% 
   filter(Fund %in% c("Global Health Security - UK Vaccine Network", "Global Health Security - GAMRIF"),
-         status == "Active")
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(ghs_awards$amount, na.rm = TRUE)
 
+
 ### Wellcome
 
-sum(wellcome_grants_final$amount)
+wellcome_grant_sum <- all_projects_tidied %>% 
+  filter(str_detect(extending_org, "Wellcome"),
+         amount > 0) %>% 
+  select(id, amount) %>% 
+  unique()
+
+sum(wellcome_grant_sum$amount, na.rm = TRUE)
 
 
 ### UK Space Agency
 
 # Check a delivery partner
-test <- all_projects %>% 
+test <- all_projects_tidied %>% 
   filter(extending_org == "UK Space Agency",
-         status == "Active") 
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(test$amount, na.rm = TRUE)
 
 
 ### Met Office
 
-test <- all_projects %>% 
+test <- all_projects_tidied %>% 
   filter(extending_org == "Met Office",
-         status == "Active") 
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(test$amount, na.rm = TRUE)
 
 
 ### British Council
 
-test <- all_projects %>% 
+test <- all_projects_tidied %>% 
   filter(Funder == "Department for Business, Energy and Industrial Strategy",
          extending_org == "British Council",
-         status == "Active",
-         end_date >= Sys.Date()) 
-
-test <- iati_activity_list %>% 
-  filter(reporting_org_ref == "GB-GOV-13",
-         partner %in% c("British Council"),
-         activity_status == "Implementation") 
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(test$amount, na.rm = TRUE)
 
 
 ### Academies
 
-test <- iati_activity_list %>% 
-  filter(reporting_org_ref == "GB-GOV-13",
-         partner %in% c("Royal Society", "Royal Academy of Engineering", "Academy of Medical Sciences", "British Academy"),
-         activity_status == "Implementation") 
+test <- all_projects_tidied %>% 
+  filter(Funder == "Department for Business, Energy and Industrial Strategy",
+         extending_org %in% c("Royal Society", "Royal Academy of Engineering", "Academy of Medical Sciences", "British Academy"),
+         status == "Active") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(test$amount, na.rm = TRUE)
 

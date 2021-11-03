@@ -33,7 +33,7 @@ saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract.rds")
 
 ### B) Activity extract for specific partner organisations ----
 
-# CGIAR, IDRC FCDO-funded activities 
+# FCDO-funded partnership activities 
 
 org_code <- c(
               "XM-DAC-47015", # CGIAR
@@ -41,7 +41,7 @@ org_code <- c(
               "XI-IATI-CABI", # CABI
               "XM-DAC-928",   # WHO
               "DAC-1601",     # Bill & Melinda Gates Foundation
-              "XI-IATI-AGR"    # AgResults (Consortium)
+              "XI-IATI-AGR"   # AgResults (Consortium)
               )   
 
 # 1) Activity extract
@@ -58,7 +58,7 @@ for (org in org_code) {
     print(paste0(org, "-", page))
     x <- nrow(org_activity_list)
       tryCatch({
-      org_activity_list <- org_activity_extract(page, org)
+      org_activity_list <- org_activity_extract(page, org, org_activity_list)
       }, error=function(e){cat("ERROR :",conditionMessage(e), "\n")})
     page <- page + 1
     y <- nrow(org_activity_list)
@@ -89,22 +89,25 @@ partner_activities_via_funder <- org_activity_list %>%
          keep_empty = TRUE) %>% 
   select(-lang.code, -lang.name) %>% 
   filter(role.name %in% c("Funding") | 
-           str_detect(iati_identifier, "XI-IATI-AGR|Windows1and2") 
+           str_detect(iati_identifier, "XI-IATI-AGR") 
            ) %>%   
   unique() %>% 
   filter(ref == "GB-GOV-1" | 
            str_detect(text, "Britain|DFID|FCDO|DHSC|Department of Health and Social Care") |
            str_detect(iati_identifier, "DFID") |
-           str_detect(iati_identifier, "Windows1and2") |             # CGIAR partially funded
            str_detect(iati_identifier, "XI-IATI-AGR")      # AgResults partially funded
          ) %>%   
   mutate(gov_funder = if_else(str_detect(text, "Health"), "Department of Health and Social Care",
                               "Foreign, Commonwealth and Development Office"),
-         fund = if_else(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(text, "Health"),
-                        "Global Health Security - GAMRIF",  # IDRC GAMRIF projects
-                   if_else(str_detect(text, "Health"), "Global Health Research - Partnerships", 
-                           if_else(str_detect(iati_identifier, "XI-IATI-AGR|Windows1and2"),
-                                   "FCDO Research - Partnerships", "FCDO Research - Programmes")))) %>% 
+         fund = case_when(
+                   # IDRC GAMRIF projects
+                   str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(text, "Health") ~ "Global Health Security - GAMRIF",
+                   # Other DHSC partnerships
+                   str_detect(text, "Health") ~ "Global Health Research - Partnerships", 
+                   # FCDO AgResults
+                   str_detect(iati_identifier, "XI-IATI-AGR") ~ "FCDO Research - Partnerships", 
+                   TRUE ~ "FCDO Research - Programmes"
+                   )) %>% 
   select(iati_identifier, activity_id, gov_funder, fund) %>% 
   unique()
 
@@ -422,9 +425,10 @@ activity_list <- activity_list %>%
 
 # Reorder columns and add date of refresh
 activity_list <- activity_list %>% 
+  mutate(activity_description = coalesce(General, Objectives)) %>% 
   select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
          hierarchy, activity_status, flow_type, fcdo_activity_id,
-         activity_title, General, Objectives, start_date, end_date,
+         activity_title, activity_description, start_date, end_date,
          recipient_country, sector_code, sector_name,
          partner, partner_role, partner_ref, partner_country, gov_funder, 
          extending_org, fund,
@@ -441,22 +445,11 @@ activity_list <- activity_list %>%
     mutate(fund = coalesce(fund, "FCDO Research - Programmes"),
            gov_funder = coalesce(gov_funder, "Foreign, Commonwealth and Development Office"))
 
-
-activity_list <- activity_list %>% 
-  rename(activity_description = General)
-
-# Remove WHO non-research/innovation activities
-activity_list <- activity_list %>% 
-  filter(is.na(reporting_org_ref) |
-           !(reporting_org_ref == "XM-DAC-928") |
-           str_detect(activity_title, "research|innovation"))
-
 # Add missing FCDO activity IDs
 activity_list <- activity_list %>% 
   mutate(programme_id = case_when(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_title, "CLARE") ~ "GB-GOV-1-300126",
                                   str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_title, "CARIAA") ~ "GB-1-203506", 
                                   str_detect(iati_identifier, "XI-IATI-AGR") ~ "GB-1-203052",
-                                  reporting_org_ref == "XM-DAC-47015" & str_detect(iati_identifier, "Windows1and2") ~ "GB-1-204764",
                                   TRUE ~ programme_id))
 
 
@@ -470,6 +463,6 @@ table(activity_list$gov_funder)
 table(activity_list$currency)
 
 # Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "Elrha"))
+test1 <- filter(activity_list, str_detect(reporting_org, "World Health Organization"))
 
 test1 <- filter(activity_list, str_detect(reporting_org, "Food"))

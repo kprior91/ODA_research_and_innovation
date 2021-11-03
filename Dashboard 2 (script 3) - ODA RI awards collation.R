@@ -395,7 +395,7 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          ) %>% 
   mutate(start_date = as.character(start_date),
          end_date = as.character(end_date),
-         currency = coalesce(Currency, "GDP"),
+         currency = coalesce(Currency, "GBP"),
          period_start = "",
          period_end = "",
          subject = "",
@@ -435,7 +435,7 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
   ) %>% 
   mutate(start_date = as.character(as.Date(`Start date`, "%d %B %Y")),
          end_date = as.character(as.Date(`End date`, "%d %B %Y")),
-         currency = coalesce(Currency, "GDP"),
+         currency = coalesce(Currency, "GBP"),
          status = if_else(`Status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
                           if_else(`Status` %in% c("Completed"), "Closed", 
                                   if_else(`Status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
@@ -468,7 +468,7 @@ roda_extract_newton_final <- roda_extract_newton %>%
          link = "",
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
-         currency = "GDP",
+         currency = "GBP",
          period_start = "",
          period_end = "",
          subject = "",
@@ -505,4 +505,8 @@ test3 <- filter(all_projects, str_detect(Funder, "Food"))
 
 # Example UKRI project funded by BEIS GCRF, FCDO and DHSC
 test4 <- filter(all_projects, str_detect(id, "MR/M009211/1"))
+
+
+
+
 
