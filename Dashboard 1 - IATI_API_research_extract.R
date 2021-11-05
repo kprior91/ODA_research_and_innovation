@@ -365,6 +365,6 @@ saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 
 # Save to Excel (for Power BI dashboard)
 write_xlsx(x = list(`IATI research` = gov_list_final), 
-           path = "IATI research activities.xlsx")
+           path = "Outputs/IATI research activities.xlsx")
 
 
