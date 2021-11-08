@@ -6,6 +6,8 @@ This work collates information on research and innovation activities funded by U
 Data updates will occur each quarter to pick up new ODA projects and changes to existing ones. These scripts are designed to be a reproducible analytical pipeline to update the public dashboards after each data update.
 
 ## Repo contents
+
+### R Scripts
 The following scripts are designed to run sequentially.
 
 **Dashboard 2 (script 0) - IATI linked partner activities.R** - set up script that loads required R packages, reads in reference/input data and defines functions used in later scripts
@@ -20,6 +22,16 @@ The following scripts are designed to run sequentially.
 NIHR Open Data), reads in other funder data (Wellcome, IATI data from previous scripts, BEIS RODA extracts), formats for consistency and collates.
 
 **Dashboard 2 (script 4) - finalisation and country extraction.R** - separates and cleans the country field for feeding into a Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
+
+### Inputs
+
+* GRID tables: references tables in Excel from the online GRID database (https://www.grid.ac/). These are used to look up the country location of research institutions
+* IATI returns: project data in spreadsheet format - i.e. that is not yet linked or correctly published to the IATI Registry. It is read in manually to the ODA project database
+* Country lookup - Tableau and DAC Income Group.xlsx - reference table to clean country data for Tableau and match to the World Bank income group
+* BEIS RODA extracts (Excel): GCRF and Newton project data provided directly by BEIS, extracted from their Reporting ODA (RODA) platform
+* IATI partner activities: IATI activity IDs of external partner data that should be included in the ODA project database but are not correctly linked in IATI so that they get pulled in in an automated way
+* Wellcome grants.xlsx: ODA grant data provided quarterly by the Wellcome Trust, identified via the UK government partner
+* UKRI non GCRF-Newton projects: UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). These have been provided directly by UKRI.
 
 ## Data visualisations
 
