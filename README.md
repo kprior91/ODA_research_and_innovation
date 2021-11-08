@@ -25,22 +25,22 @@ NIHR Open Data), reads in other funder data (Wellcome, IATI data from previous s
 
 ### Inputs
 
-* GRID tables: references tables in Excel from the online GRID database (https://www.grid.ac/). These are used to look up the country location of research institutions
-* IATI returns: project data in spreadsheet format - i.e. that is not yet linked or correctly published to the IATI Registry. It is read in manually to the ODA project database
-* Country lookup - Tableau and DAC Income Group.xlsx - reference table to clean country data for Tableau and match to the World Bank income group
-* BEIS RODA extracts (Excel): GCRF and Newton project data provided directly by BEIS, extracted from their Reporting ODA (RODA) platform
-* IATI partner activities: IATI activity IDs of external partner data that should be included in the ODA project database but are not correctly linked in IATI so that they get pulled in in an automated way
-* Wellcome grants.xlsx: ODA grant data provided quarterly by the Wellcome Trust, identified via the UK government partner
-* UKRI non GCRF-Newton projects: UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). These have been provided directly by UKRI.
+* *GRID tables:* references tables in Excel from the online GRID database (https://www.grid.ac/). These are used to look up the country location of research institutions
+* *IATI returns:* project data in spreadsheet format - i.e. that is not yet linked or correctly published to the IATI Registry. It is read in manually to the ODA project database
+* *Country lookup - Tableau and DAC Income Group.xlsx* - reference table to clean country data for Tableau and match to the World Bank income group
+* *BEIS RODA extracts (Excel):* GCRF and Newton project data provided directly by BEIS, extracted from their Reporting ODA (RODA) platform
+* *IATI partner activities.xlsx:* IATI activity IDs of external partner data that should be included in the ODA project database but are not correctly linked in IATI so that they get pulled in in an automated way
+* *Wellcome grants.xlsx:* ODA grant data provided quarterly by the Wellcome Trust, identified via the UK government partner
+* *UKRI non GCRF-Newton projects.xlsx:* UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). These have been provided directly by UKRI.
 
 ## Data visualisations
 
 Output from the two scripts above feed two visualisations of ODA funded research & innovation:
 
-*Dashboard 1: (Power BI)
+* Dashboard 1: (Power BI)
 https://app.powerbi.com/view?r=eyJrIjoiOTg1ODdlYjctNjEwOC00MWJmLWFiOGQtZjQ1NjU0MzhmNjI3IiwidCI6IjNiN2E2NzVhLTFmYzgtNDk4My1hMTAwLWNjNTJiNzY0NzczNyIsImMiOjh9
 
-*Dashboard 2: Funded ODA R&I awards by country: 
+* Dashboard 2: Funded ODA R&I awards by country: 
 https://public.tableau.com/views/ODARIprojectsv3/MainPage?:language=en-US&:display_count=n&:origin=viz_share_link
 
 ## Exploration and Analysis
