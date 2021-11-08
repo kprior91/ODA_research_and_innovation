@@ -1,4 +1,4 @@
-# Mapping ODA-funded research and innovation projects
+# Mapping ODA-funded research and innovation (MODARI) - project data
 
 ## Background
 This work collates information on research and innovation activities funded by UK Official Development Assistance (ODA) across all UK government funders and external partners. R scripts are used to extract and process project data, either shared in spreadsheet format or extracted from funders' public data repositories. Data on ODA research spend and active projects is then visualised in public Power BI and Tableau dashboards. These are designed to be accessible to a wide range of stakeholders and can be searched by funder, country and external partner.
