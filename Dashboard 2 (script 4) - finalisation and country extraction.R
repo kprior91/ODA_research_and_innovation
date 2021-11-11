@@ -106,9 +106,7 @@ rm(duplicate_country_projects)
 
 # Tidy fund and funder labelling
 all_projects_tidied <- all_projects_tidied %>% 
-  mutate(Fund = if_else(str_detect(Fund, "FCDO Research & Innovation|FCDO fully"), "FCDO Research - Programmes", Fund),
-         Fund = if_else(str_detect(Fund, "FCDO partially"), "FCDO Research - Partnerships", Fund),
-         currency = if_else(currency == "GDP", "GBP", currency))
+  mutate(Fund = if_else(str_detect(Fund, "FCDO Research & Innovation"), "FCDO Research - Programmes", Fund))
 
 # Add FCDO programme ID to dataset
 all_projects_tidied <- all_projects_tidied %>% 
