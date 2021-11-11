@@ -16,6 +16,9 @@ if (!("httr" %in% installed.packages())) {
 if (!("tidyverse" %in% installed.packages())) {
   install.packages("tidyverse")
 }
+if (!("dplyr" %in% installed.packages())) {
+  install.packages("dplyr")
+}
 if (!("readxl" %in% installed.packages())) {
   install.packages("readxl")
 }
@@ -35,6 +38,7 @@ if (!("openxlsx" %in% installed.packages())) {
 library(jsonlite)
 library(httr)
 library(tidyverse)
+library(dplyr)
 library(readxl)
 library(writexl)
 library(googlesheets4)

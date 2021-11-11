@@ -266,6 +266,21 @@ iati_projects <- iati_activity_list %>%
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
   plyr::rbind.fill(partner_iati_list) # Add partner activities
 
+  # Add UKRI beneficiary countries
+  ukri_iati_projects <- iati_activity_list %>% 
+    filter(extending_org == "UK Research & Innovation") %>% 
+    mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>% 
+    mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>% 
+    mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
+    select(gtr_id, iati_country = recipient_country) %>% 
+    filter(!is.na(iati_country)) %>% 
+    unique()
+    
+  ukri_projects_with_countries <- ukri_projects_final %>% 
+    left_join(ukri_iati_projects, by = c("id" = "gtr_id")) %>% 
+    mutate(recipient_country = coalesce(iati_country, recipient_country)) %>% 
+    select(-iati_country)
+
 # Keep required fields
 iati_projects_final <- iati_projects %>% 
   mutate(Funder = coalesce(gov_funder, reporting_org),
@@ -487,7 +502,7 @@ rm(roda_extract_newton)
 
 # 7) Join funder datasets together ----------------------------------------------
 
-all_projects <- rbind(ukri_projects_final, nihr_projects_final, 
+all_projects <- rbind(ukri_projects_with_countries, nihr_projects_final, 
                       iati_projects_final, wellcome_grants_final,
                       collated_spreadsheet_data,
                       roda_extract_gcrf_final, roda_extract_newton_final) %>% 
