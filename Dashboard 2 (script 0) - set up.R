@@ -34,6 +34,16 @@ if (!("gargle" %in% installed.packages())) {
 if (!("openxlsx" %in% installed.packages())) {
   install.packages("openxlsx")
 } # for adding hyperlinks and formatting to output Excel reports
+if (!("DBI" %in% installed.packages())) {
+  install.packages("DBI")
+} # for read/writing to Excel database
+if (!("odbc" %in% installed.packages())) {
+  install.packages("odbc")
+} 
+if (!("countrycode" %in% installed.packages())) {
+  install.packages("countrycode")
+} 
+
 
 library(jsonlite)
 library(httr)
@@ -44,13 +54,16 @@ library(writexl)
 library(googlesheets4)
 library(gargle)
 library(openxlsx)
-
+library(DBI)
+library(odbc)
+library(countrycode)
 
 ### Read in reference data ----
 
 # 1) GRID research institution lookup
 grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>% 
   select(grid_id, name) %>% 
+  mutate(name = str_to_lower(name)) %>% 
   unique()  %>% 
   # Remove common organisation names
   filter(!(name %in% c("Ministry of Health", "Ministry of Public Health")))
@@ -60,6 +73,10 @@ grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>%
   unique()
 
 grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
+
+# Country names
+countries <- c(countrycode::codelist$country.name.en, "UK")
+countries_string <- paste0(str_to_lower(countries), collapse = "|")
 
 
 # 2) DAC country lookup and Tableau accepted country list
@@ -83,6 +100,34 @@ roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
 
 
 ### Functions -----
+
+### Country lookup of organisation ###
+
+org_country_lookup <- function(org_name) {
+  
+  # Look up country from GRID database
+  country_lookup <- data.frame(name = str_to_lower(org_name)) %>%
+    
+    # Join on GRID database
+    left_join(grid_institutes, by = "name") %>% 
+    left_join(grid_addresses, by = "grid_id") %>% 
+    select(name, grid_country = country) %>% 
+    
+    # Extract any countries in name
+    mutate(name_country = str_extract_all(name, countries_string)) %>% 
+    unnest(cols = name_country, keep_empty = TRUE) %>% 
+  
+    # Coalesce country results
+    mutate(final_country = coalesce(grid_country, name_country))
+  
+    result <- str_to_title((country_lookup$final_country)[1])
+  
+  return(result)
+}
+
+# Test
+# org_name <- "University Of Cambridge, Ghana"
+# org_country_lookup("Bbox, uk")
 
 
 ### IATI ###

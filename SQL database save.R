@@ -1,8 +1,5 @@
 # Script to split output dataset into 4 relational tables to save in SQL
 
-library(DBI)
-library(tidyverse)
-
 # Read in final dataset from scripts 4 and 5
 all_projects <- readRDS("Outputs/all_projects.rds") 
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
