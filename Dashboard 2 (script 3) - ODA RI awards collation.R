@@ -328,7 +328,7 @@ rm(iati_projects)
 
 # Add missing fields and format Funder/Fund field
 wellcome_grants_formatted <- wellcome_grants %>% 
-  mutate(status = if_else(Sys.Date() <= `Planned Dates:End Date`, "Active", "Closed"),
+  mutate(status = if_else(Sys.Date() <= `Planned Dates: End Date`, "Active", "Closed"),
          extending_org = "Wellcome Trust",
          currency = "GBP",
          partner_org_name = `Other Implementing Organisations`,
@@ -337,33 +337,33 @@ wellcome_grants_formatted <- wellcome_grants %>%
          period_start = "",
          period_end = "",
          iati_id = "",
-         Funder = if_else(str_detect(`Co-funder`, "National Institute for Health Research"), 
-                          "Department of Health and Social Care", `Co-funder`),
+         Funder = if_else(str_detect(`CoFunders`, "National Institute for Health Research"), 
+                          "Department of Health and Social Care", `CoFunders`),
          Fund = if_else(Funder == "Department of Health and Social Care",
                         "Global Health Research - Partnerships", "FCDO Research - Programmes"),
          last_updated = quarter_end_date) 
 
 # Select desired variables
 wellcome_grants_formatted <- wellcome_grants_formatted %>% 
-  select(id = `Internal ID`,
+  select(id = `InternalID`,
          title = Title, 
          abstract = Description,
-         start_date = `Planned Dates:Start Date`,
-         end_date = `Planned Dates:End Date`,
-         amount = `ODA funding`,
+         start_date = `Planned Dates: Start Date`,
+         end_date = `Planned Dates: End Date`,
+         amount = `ODA Funding`,
          period_start,
          period_end,
          currency,
          extending_org,
-         lead_org_name = `Recipient Org:Name`,
-         lead_org_country = `Recipient Org:Country`,
+         lead_org_name = `Recipient Org: Name`,
+         lead_org_country = `Recipient Org: Country`,
          partner_org_name,
          partner_org_country,
          iati_id,
          Fund,
          Funder, 
          recipient_country,
-         subject = `Partnership Name`,
+         subject = `PartnershipName`,
          status,
          last_updated
   ) 
@@ -515,7 +515,7 @@ saveRDS(all_projects, file = "Outputs/all_projects.rds")
 
 # 8) CHECKING ----
 test1 <- filter(all_projects, str_detect(extending_org, "Food"))
-test2 <- filter(all_projects, str_detect(id, "GB-1-202568-1"))
+test2 <- filter(all_projects, str_detect(id, "CA-CRA_ACR-811793611-HGC"))
 test3 <- filter(all_projects, str_detect(Funder, "Food"))
 
 # Example UKRI project funded by BEIS GCRF, FCDO and DHSC

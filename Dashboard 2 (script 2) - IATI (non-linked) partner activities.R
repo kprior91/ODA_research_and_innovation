@@ -159,10 +159,12 @@ activity_list_unnest_1 <- partner_activity_comb %>%
   filter(lang.name == "English") %>% 
   select(-lang.code, -lang.name) %>% 
   rename(activity_title = text) %>% 
+  filter(lengths(description) != 0) %>% 
   unnest(cols = description,
          keep_empty = TRUE) %>% 
   mutate(type.name = coalesce(type.name, "General")) %>% 
   select(iati_identifier, activity_title, type.name, narrative) %>% 
+  filter(lengths(narrative) != 0) %>% 
   unnest(cols = narrative,
          keep_empty = TRUE) %>%  
   filter(lang.name == "English") %>% 
@@ -186,6 +188,7 @@ activity_list_unnest_1 <- activity_list_unnest_1 %>%
 
 # 2) Unlist recipient countries
 activity_list_unnest_2 <- partner_activity_comb %>% 
+  filter(lengths(recipient_country) != 0) %>% 
   unnest(cols = recipient_country,
          keep_empty = TRUE) %>% 
   select(iati_identifier, country.name) %>% 
@@ -194,8 +197,8 @@ activity_list_unnest_2 <- partner_activity_comb %>%
   summarise(country_name = paste(coalesce(country.name, ""), collapse = ", "))
 
   # Identify activities without recipient countries at activity level
-  no_country_info <- activity_list_unnest_2 %>% 
-    filter(country_name == "")
+  no_country_info <- partner_activity_comb %>% 
+    filter(lengths(recipient_country) == 0)
   
   # Extract transactions for these activities
       
@@ -220,9 +223,10 @@ activity_list_unnest_2 <- partner_activity_comb %>%
       # Unnest information -----
       
       transactions_unnest <- transaction_list %>% 
+        filter(lengths(recipient_countries) != 0) %>% 
         unnest(cols = recipient_countries,
                keep_empty = TRUE) %>%
-        select(-country.url, -recipient_countries, -recipient_regions) %>% 
+        select(-country.url, -recipient_regions) %>% 
         rename(recipient_country = country.name) %>% 
   
         # remove transactions without a country
@@ -244,6 +248,7 @@ activity_list_unnest_2 <- partner_activity_comb %>%
 
 # 3) Unlist sectors
 activity_list_unnest_3 <- partner_activity_comb %>% 
+  filter(lengths(sector) != 0) %>% 
   unnest(cols = sector,
          keep_empty = TRUE) %>% 
   select(iati_identifier, sector.code, sector.name, percentage) %>% 
@@ -260,6 +265,7 @@ activity_list_unnest_3 <- activity_list_unnest_3 %>%
 
 # 4) Unlist implementing organisations
 activity_list_unnest_4 <- partner_activity_comb %>%
+  filter(lengths(participating_org) != 0) %>% 
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative, ref) %>% 
@@ -283,33 +289,15 @@ activity_list_unnest_4 <- partner_activity_comb %>%
   )) 
 
 
-# Match institutions to countries with GRID database
-
-country_match_1 <- activity_list_unnest_4 %>% 
-  left_join(grid_institutes, by = c("text" = "name")) %>% 
-  left_join(grid_addresses, by = "grid_id") %>% 
-  group_by(iati_identifier, text, ref) %>% 
-  slice(1) %>% 
-  ungroup() %>% 
-  mutate(partner_country = if_else(text == "International Development Research Centre", "Canada", 
-                                   if_else(text == "CABI", "United Kingdom", partner_country))) %>% 
-  mutate(partner_country = coalesce(partner_country, country)) %>% 
+# Look up country of organisation
+country_match <- activity_list_unnest_4 %>% 
+  mutate(org_country = map(text, org_country_lookup)) %>% 
+  mutate(partner_country = coalesce(partner_country, org_country)) %>% 
   select(iati_identifier, partner_country) %>% 
   unique()
 
-# Extract countries mentioned in the partner organisation name
-countries <- countrycode::codelist$country.name.en
-countries_string <- paste0(countries, collapse = "|")
-
-country_match_2 <- activity_list_unnest_4 %>% 
-  mutate(partner_country = str_extract_all(text, countries_string)) %>% 
-  unnest(cols = partner_country) %>% 
-  select(iati_identifier, partner_country) %>% 
-  unique() 
-
 # Combine and dedup
-country_match <- rbind(country_match_1, country_match_2) %>% 
-  unique() %>% 
+country_match <- country_match %>% 
   group_by(iati_identifier) %>% 
   filter(!is.na(partner_country)) %>% 
   summarise(partner_country = paste(coalesce(partner_country, ""), collapse = ", "))
