@@ -279,8 +279,7 @@ activity_list_unnest_4 <- partner_activity_comb %>%
 
   # Add country locations based on IATI references or lookup
     activity_list_unnest_4 <- activity_list_unnest_4 %>%
-      filter(str_detect(iati_identifier, "XM-DAC-301-2")) %>% 
-      head(10) %>% 
+      filter(role.name == "Implementing") %>% 
       mutate(
         org_country_iati = case_when(        
           str_detect(ref, "GB") ~ "United Kingdom", 
@@ -297,7 +296,6 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       
   # Separate implementing orgs
     activity_list_unnest_4_partner_names <- activity_list_unnest_4 %>% 
-      filter(role.name == "Implementing") %>% 
       select(iati_identifier, text) %>% 
       filter(!is.na(text)) %>% 
       unique() %>% 
@@ -305,38 +303,18 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       summarise(partner = paste(coalesce(text, ""), collapse = ", "))
     
     activity_list_unnest_4_partner_countries <- activity_list_unnest_4 %>% 
-      filter(role.name == "Implementing") %>% 
       select(iati_identifier, org_country) %>% 
       filter(!is.na(org_country)) %>% 
       unique() %>% 
       group_by(iati_identifier) %>% 
       summarise(partner_country = paste(coalesce(org_country, ""), collapse = ", "))
 
-  # Separate extending orgs
-    activity_list_unnest_4_extending_names <- activity_list_unnest_4 %>% 
-      filter(role.name == "Extending") %>% 
-      select(iati_identifier, text) %>% 
-      filter(!is.na(text)) %>% 
-      unique() %>% 
-      group_by(iati_identifier) %>% 
-      summarise(extending_org = paste(coalesce(text, ""), collapse = ", "))
-    
-    activity_list_unnest_4_extending_countries <- activity_list_unnest_4 %>% 
-      filter(role.name == "Extending") %>% 
-      select(iati_identifier, org_country) %>% 
-      filter(!is.na(org_country)) %>% 
-      unique() %>% 
-      group_by(iati_identifier) %>% 
-      summarise(extending_org_country = paste(coalesce(org_country, ""), collapse = ", "))
-    
   # Combine in single dataset
   activity_list_unnest_4_final <- activity_list_unnest_4 %>% 
     select(iati_identifier) %>% 
     unique() %>% 
     left_join(activity_list_unnest_4_partner_names, by = "iati_identifier") %>% 
-    left_join(activity_list_unnest_4_partner_countries, by = "iati_identifier") %>% 
-    left_join(activity_list_unnest_4_extending_names, by = "iati_identifier") %>% 
-    left_join(activity_list_unnest_4_extending_countries, by = "iati_identifier")
+    left_join(activity_list_unnest_4_partner_countries, by = "iati_identifier")
 
 
 # 5) Unlist publishing org
@@ -348,7 +326,7 @@ activity_list_unnest_5 <- partner_activity_comb %>%
          reporting_org_type = reporting_org.type.name,
          reporting_org = text) %>% 
   # Account for IDRC having names in 3 languages
-  filter(!(reporting_org_ref == "XM-DAC-301-2") | reporting_org == "	International Development Research Centre") %>% 
+  filter(reporting_org_ref != "XM-DAC-301-2" | reporting_org == "International Development Research Centre") %>% 
   unique()
 
     # Lookup country
@@ -432,17 +410,16 @@ activity_list <- activity_list_base %>%
 # Assign a reporting org if the reporting partner is implementing 
 # the activity themselves
 activity_list <- activity_list %>% 
-  mutate(reporting_org = coalesce(reporting_org, reporting_org_ref, extending_org, gov_funder))
+  mutate(reporting_org = coalesce(reporting_org, reporting_org_ref, gov_funder))
 
 # Reorder columns and add date of refresh
 activity_list <- activity_list %>% 
   mutate(activity_description = coalesce(General, Objectives)) %>% 
-  select(iati_identifier, reporting_org_ref, reporting_org_type, reporting_org,
+  select(iati_identifier, reporting_org_ref, reporting_org, reporting_org_country,
          hierarchy, activity_status, flow_type, fcdo_activity_id,
          activity_title, activity_description, start_date, end_date,
          recipient_country, sector_code, sector_name,
          partner, partner_country, 
-         extending_org, extending_org_country,
          gov_funder, fund,
          amount, period_start, period_end, currency) %>% 
   unique() %>% 
@@ -450,7 +427,6 @@ activity_list <- activity_list %>%
 
 # Add Fund label
 activity_list <- activity_list %>%  
-    select(-extending_org) %>% 
     left_join(select(iati_activity_ids, gov_funder, iati_id, funding_iati_id), 
               by = c("iati_identifier" = "iati_id", "gov_funder")) %>% 
     mutate(programme_id = coalesce(funding_iati_id, fcdo_activity_id)) %>% 
