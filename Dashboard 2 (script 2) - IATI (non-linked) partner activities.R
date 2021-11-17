@@ -152,7 +152,7 @@ activity_list_base <- partner_activity_comb %>%
   unique()
 
 
-# a) Unlist activity title and description
+# 1) Unlist activity title and description
 activity_list_unnest_1 <- partner_activity_comb %>% 
   unnest(cols = title.narrative,
          keep_empty = TRUE) %>% 
@@ -171,18 +171,18 @@ activity_list_unnest_1 <- partner_activity_comb %>%
   unique()
 
 
-# Fix records with multiple "General" descriptions
-
-activities_to_fix <- activity_list_unnest_1 %>% 
-                        group_by(iati_identifier, activity_title, type.name) %>% 
-                        summarise(no_descriptions = n()) %>% 
-                        filter(no_descriptions > 1)
-
-
-activity_list_unnest_1 <- activity_list_unnest_1 %>% 
-                              group_by(iati_identifier, activity_title, type.name) %>% 
-                              summarise(text = paste(coalesce(text, ""), collapse = "; ")) %>% 
-                              spread(key = type.name, value = text)
+    # Fix records with multiple "General" descriptions
+    
+    activities_to_fix <- activity_list_unnest_1 %>% 
+                            group_by(iati_identifier, activity_title, type.name) %>% 
+                            summarise(no_descriptions = n()) %>% 
+                            filter(no_descriptions > 1)
+    
+    
+    activity_list_unnest_1 <- activity_list_unnest_1 %>% 
+                                  group_by(iati_identifier, activity_title, type.name) %>% 
+                                  summarise(text = paste(coalesce(text, ""), collapse = "; ")) %>% 
+                                  spread(key = type.name, value = text)
 
 
 
@@ -257,92 +257,122 @@ activity_list_unnest_3 <- partner_activity_comb %>%
   group_by(iati_identifier) %>%
   unique()
 
-# Summarise all sector descriptions for each activity
-activity_list_unnest_3 <- activity_list_unnest_3 %>% 
-  summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
-            sector_name = paste(coalesce(sector.name, ""), collapse = ", "))
+    # Summarise all sector descriptions for each activity
+    activity_list_unnest_3 <- activity_list_unnest_3 %>% 
+      summarise(sector_code = paste(coalesce(sector.code, ""), collapse = ", "),
+                sector_name = paste(coalesce(sector.name, ""), collapse = ", "))
 
 
-# 4) Unlist implementing organisations
+# 4) Unlist organisations
 activity_list_unnest_4 <- partner_activity_comb %>%
   filter(lengths(participating_org) != 0) %>% 
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative, ref) %>% 
+  filter(lengths(narrative) != 0,
+         role.name != "Funding") %>% 
   unnest(cols = narrative,
          keep_empty = TRUE) %>% 
-  filter(role.name == "Implementing") %>% 
-  # filter(!(text %in% c("Centre de recherches pour le développement international",
-  #                      "Centro Internacional de Investigaciones para el Desarrollo"))) %>% 
   filter(lang.name == "English") %>% 
   select(-lang.code, -lang.name) %>% 
-  unique() %>% 
-  # Add simple country locations based on IATI references
-  mutate(partner_country = case_when(        
-    str_detect(ref, "GB") ~ "United Kingdom", 
-    str_detect(ref, "US") ~ "United States", 
-    str_detect(ref, "NL") ~ "Netherlands",
-    str_detect(ref, "CA-") ~ "Canada",
-    str_detect(ref, "IN-") ~ "India",
-    str_detect(ref, "KE-") ~ "Kenya",
-    str_detect(ref, "ZA-") ~ "South Africa",
-  )) 
-
-
-# Look up country of organisation
-country_match <- activity_list_unnest_4 %>% 
-  mutate(org_country = map(text, org_country_lookup)) %>% 
-  mutate(partner_country = coalesce(partner_country, org_country)) %>% 
-  select(iati_identifier, partner_country) %>% 
   unique()
 
-# Combine and dedup
-country_match <- country_match %>% 
-  group_by(iati_identifier) %>% 
-  filter(!is.na(partner_country)) %>% 
-  summarise(partner_country = paste(coalesce(partner_country, ""), collapse = ", "))
+  # Add country locations based on IATI references or lookup
+    activity_list_unnest_4 <- activity_list_unnest_4 %>%
+      filter(str_detect(iati_identifier, "XM-DAC-301-2")) %>% 
+      head(10) %>% 
+      mutate(
+        org_country_iati = case_when(        
+          str_detect(ref, "GB") ~ "United Kingdom", 
+          str_detect(ref, "US") ~ "United States", 
+          str_detect(ref, "NL") ~ "Netherlands",
+          str_detect(ref, "CA-") ~ "Canada",
+          str_detect(ref, "IN-") ~ "India",
+          str_detect(ref, "KE-") ~ "Kenya",
+          str_detect(ref, "ZA-") ~ "South Africa"),
+        org_country_other = map(text, org_country_lookup)) %>% 
+      mutate(org_country_other = unlist(org_country_other)) %>% 
+      mutate(org_country = coalesce(org_country_iati, org_country_other)) %>% 
+      select(-org_country_iati, -org_country_other)
+      
+  # Separate implementing orgs
+    activity_list_unnest_4_partner_names <- activity_list_unnest_4 %>% 
+      filter(role.name == "Implementing") %>% 
+      select(iati_identifier, text) %>% 
+      filter(!is.na(text)) %>% 
+      unique() %>% 
+      group_by(iati_identifier) %>% 
+      summarise(partner = paste(coalesce(text, ""), collapse = ", "))
+    
+    activity_list_unnest_4_partner_countries <- activity_list_unnest_4 %>% 
+      filter(role.name == "Implementing") %>% 
+      select(iati_identifier, org_country) %>% 
+      filter(!is.na(org_country)) %>% 
+      unique() %>% 
+      group_by(iati_identifier) %>% 
+      summarise(partner_country = paste(coalesce(org_country, ""), collapse = ", "))
 
-# Join to partner list
-activity_list_unnest_4_partners <- activity_list_unnest_4 %>% 
-  select(iati_identifier, text, role.name, ref) %>% 
-  unique() %>% 
-  filter(!is.na(text)) %>% 
-  group_by(iati_identifier) %>% 
-  summarise(partner = paste(coalesce(text, ""), collapse = ", ")) %>% 
-  left_join(country_match, by = "iati_identifier") 
+  # Separate extending orgs
+    activity_list_unnest_4_extending_names <- activity_list_unnest_4 %>% 
+      filter(role.name == "Extending") %>% 
+      select(iati_identifier, text) %>% 
+      filter(!is.na(text)) %>% 
+      unique() %>% 
+      group_by(iati_identifier) %>% 
+      summarise(extending_org = paste(coalesce(text, ""), collapse = ", "))
+    
+    activity_list_unnest_4_extending_countries <- activity_list_unnest_4 %>% 
+      filter(role.name == "Extending") %>% 
+      select(iati_identifier, org_country) %>% 
+      filter(!is.na(org_country)) %>% 
+      unique() %>% 
+      group_by(iati_identifier) %>% 
+      summarise(extending_org_country = paste(coalesce(org_country, ""), collapse = ", "))
+    
+  # Combine in single dataset
+  activity_list_unnest_4_final <- activity_list_unnest_4 %>% 
+    select(iati_identifier) %>% 
+    unique() %>% 
+    left_join(activity_list_unnest_4_partner_names, by = "iati_identifier") %>% 
+    left_join(activity_list_unnest_4_partner_countries, by = "iati_identifier") %>% 
+    left_join(activity_list_unnest_4_extending_names, by = "iati_identifier") %>% 
+    left_join(activity_list_unnest_4_extending_countries, by = "iati_identifier")
 
 
-# 4) Unlist extending organisations
-activity_list_unnest_5 <- partner_activity_comb %>% 
-  unnest(cols = participating_org,
-         keep_empty = TRUE) %>% 
-  select(iati_identifier, role.name, narrative) %>% 
-  unnest(cols = narrative,
-         keep_empty = TRUE) %>% 
-  filter(lang.name == "English") %>% 
-  select(-lang.code, -lang.name) %>% 
-  filter(role.name %in% c("Extending")) %>% 
-  unique() %>% 
-  group_by(iati_identifier) %>%
-  summarise(extending_org = paste(coalesce(text, ""), collapse = ", "))
-
-
-# 5) Unlist reporting department
-activity_list_unnest_6 <- partner_activity_comb %>% 
+# 5) Unlist publishing org
+activity_list_unnest_5 <- partner_activity_comb %>%
+  filter(lengths(reporting_org.narrative) != 0) %>% 
   unnest(cols = reporting_org.narrative,
          keep_empty = TRUE) %>% 
   select(iati_identifier, reporting_org_ref = reporting_org.ref, 
          reporting_org_type = reporting_org.type.name,
          reporting_org = text) %>% 
+  # Account for IDRC having names in 3 languages
   filter(!(reporting_org_ref == "XM-DAC-301-2") | reporting_org == "	International Development Research Centre") %>% 
   unique()
 
+    # Lookup country
+    activity_list_unnest_5 <- activity_list_unnest_5 %>% 
+        mutate(
+          org_country_iati = case_when(        
+            str_detect(reporting_org_ref, "GB") ~ "United Kingdom", 
+            str_detect(reporting_org_ref, "US") ~ "United States", 
+            str_detect(reporting_org_ref, "NL") ~ "Netherlands",
+            str_detect(reporting_org_ref, "CA-") ~ "Canada",
+            str_detect(reporting_org_ref, "IN-") ~ "India",
+            str_detect(reporting_org_ref, "KE-") ~ "Kenya",
+            str_detect(reporting_org_ref, "ZA-") ~ "South Africa"),
+          org_country_other = map(reporting_org, org_country_lookup)) %>% 
+          mutate(org_country_other = unlist(org_country_other)) %>% 
+          mutate(reporting_org_country = coalesce(org_country_iati, org_country_other)) %>% 
+          select(-org_country_iati, -org_country_other)
+
 
 # 6) Unlist and aggregate committments
-activity_list_unnest_7 <- partner_activity_comb %>% 
+activity_list_unnest_6 <- partner_activity_comb %>% 
+  filter(lengths(budget) != 0) %>% 
   unnest(cols = budget,
          keep_empty = TRUE) %>% 
-#  filter(value.date >= "2015-04-01" & value.date <= "2020-03-31") %>%   # restrict time window for spend
   select(iati_identifier, 
          budget_status = status.name, 
          amount = value.value, 
@@ -356,24 +386,24 @@ activity_list_unnest_7 <- partner_activity_comb %>%
   filter(!is.na(budget_status)) %>% 
   ungroup()
 
-# Find activities with multiple budgets for the same period
-multiple_budgets <- activity_list_unnest_7 %>% 
-  group_by(iati_identifier, period_start, period_end) %>% 
-  summarise(count = n()) %>% 
-  filter (count > 1)
+    # Find activities with multiple budgets for the same period
+    multiple_budgets <- activity_list_unnest_6 %>% 
+      group_by(iati_identifier, period_start, period_end) %>% 
+      summarise(count = n()) %>% 
+      filter (count > 1)
+    
+    # Keep only the committed budget in these cases
+    activity_list_unnest_6_dedup <- activity_list_unnest_6 %>% 
+      filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
+               budget_status == "Committed") %>% 
+      group_by(iati_identifier, currency) %>%     # budget_status removed
+      summarise(period_start = min(period_start),
+                period_end = max(period_end),
+                amount = sum(amount))
 
-# Keep only the committed budget in these cases
-activity_list_unnest_7_dedup <- activity_list_unnest_7 %>% 
-  filter(!(iati_identifier %in% multiple_budgets$iati_identifier) |
-           budget_status == "Committed") %>% 
-  group_by(iati_identifier, currency) %>%     # budget_status removed
-  summarise(period_start = min(period_start),
-            period_end = max(period_end),
-            amount = sum(amount))
 
-
-# 8) Unlist start/end dates
-activity_list_unnest_8 <- partner_activity_comb %>% 
+# 7) Unlist start/end dates
+activity_list_unnest_7 <- partner_activity_comb %>% 
   unnest(cols = activity_date,
          keep_empty = TRUE) %>% 
   select(iati_identifier, 
@@ -393,11 +423,10 @@ activity_list <- activity_list_base %>%
   left_join(activity_list_unnest_1, by = "iati_identifier") %>%
   left_join(activity_list_unnest_2_comp, by = "iati_identifier") %>%
   left_join(activity_list_unnest_3, by = "iati_identifier") %>%
-  left_join(activity_list_unnest_4_partners, by = "iati_identifier") %>% 
+  left_join(activity_list_unnest_4_final, by = "iati_identifier") %>% 
   left_join(activity_list_unnest_5, by = "iati_identifier") %>% 
-  left_join(activity_list_unnest_6, by = "iati_identifier") %>% 
-  left_join(activity_list_unnest_7_dedup, by = "iati_identifier") %>% 
-  left_join(activity_list_unnest_8, by = "iati_identifier")
+  left_join(activity_list_unnest_6_dedup, by = "iati_identifier") %>% 
+  left_join(activity_list_unnest_7, by = "iati_identifier")
 
 
 # Assign a reporting org if the reporting partner is implementing 
@@ -408,12 +437,13 @@ activity_list <- activity_list %>%
 # Reorder columns and add date of refresh
 activity_list <- activity_list %>% 
   mutate(activity_description = coalesce(General, Objectives)) %>% 
-  select(reporting_org_ref, reporting_org_type, reporting_org, iati_identifier,
+  select(iati_identifier, reporting_org_ref, reporting_org_type, reporting_org,
          hierarchy, activity_status, flow_type, fcdo_activity_id,
          activity_title, activity_description, start_date, end_date,
          recipient_country, sector_code, sector_name,
-         partner, partner_country, gov_funder, 
-         extending_org, fund,
+         partner, partner_country, 
+         extending_org, extending_org_country,
+         gov_funder, fund,
          amount, period_start, period_end, currency) %>% 
   unique() %>% 
   mutate(refresh_date = Sys.Date())
@@ -446,5 +476,3 @@ table(activity_list$currency)
 
 # Check specific partner
 test1 <- filter(activity_list, str_detect(reporting_org, "World Health Organization"))
-
-test1 <- filter(activity_list, str_detect(reporting_org, "Food"))

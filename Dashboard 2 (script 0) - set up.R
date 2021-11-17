@@ -126,8 +126,8 @@ org_country_lookup <- function(org_name) {
 }
 
 # Test
-# org_name <- "University Of Cambridge, Ghana"
-# org_country_lookup("Bbox, uk")
+# org_name <- "International Development Research Centre"
+# org_country_lookup(org_name)
 
 
 ### IATI ###
