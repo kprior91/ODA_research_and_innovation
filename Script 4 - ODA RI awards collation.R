@@ -78,7 +78,7 @@ ukri_projects_by_id <- data.frame()
 
 # Run project info extraction over all GtR projects
 
-n <- 0 # set counter
+n <- 1 # set counter
 
 for (id in ukri_projects_ids$`GtR ID`) {
   
@@ -154,6 +154,14 @@ ukri_projects_final <- ukri_projects_final %>%
 # Add GtR link to projects
 ukri_projects_final <- ukri_projects_final %>% 
   mutate(link = paste0("https://gtr.ukri.org/projects?ref=", id))
+
+# Remove duplicates based on different ordered partners orgs (if a project is
+# co-funded, its information will be extracted more than once from the GtR API
+# and may be in a different order)
+
+ukri_projects_final <- ukri_projects_final %>% 
+  group_by(across(c(-partner_org_name))) %>% 
+  slice(1)
 
 # Save as R file (to read back in if needed)
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
@@ -521,6 +529,9 @@ test3 <- filter(all_projects, str_detect(Funder, "Food"))
 # Example UKRI project funded by BEIS GCRF, FCDO and DHSC
 test4 <- filter(all_projects, str_detect(id, "MR/M009211/1"))
 
+test3 <- filter(ukri_projects_by_fund_with_id, str_detect(`GtR ID`, "MR/M009211/1"))
+test2 <- filter(ukri_projects_ids, str_detect(`GtR ID`, "MR/M009211/1"))
+test4 <- filter(ukri_projects_final, str_detect(id, "MR/N006267/1"))
 
 
 

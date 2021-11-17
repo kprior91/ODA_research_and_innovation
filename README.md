@@ -10,18 +10,21 @@ Data updates will occur each quarter to pick up new ODA projects and changes to 
 ### R Scripts
 The following scripts are designed to run sequentially.
 
-**Dashboard 2 (script 0) - IATI linked partner activities.R** - set up script that loads required R packages, reads in reference/input data and defines functions used in later scripts
+**Script 0 - set up.R** - set up script that loads required R packages, reads in reference/input data and defines functions used in later scripts
 
-**Dashboard 1 - IATI_API_research_extract.R** - extracts all ODA research and innovation activities from UK government funders' published IATI transparency data. Relevant activities are either identified by fund (e.g. BEIS GCRF/Newton) or a relevant research OECD sector code.
+**Script 1 - UK gov funder IATI research extract.R** - extracts all ODA research and innovation activities from UK government funders' published IATI transparency data. Relevant activities are either identified by fund (e.g. BEIS GCRF/Newton) or a relevant research OECD sector code.
 
-**Dashboard 2 (script 1) - IATI linked partner activities.R** - extracts all IATI activities published by external partners that are linked to a UK government funder ODA programme via an activity ID in the partner's incoming funds. This is exclusively FCDO partners currently
+**Script 2 - IATI linked partner activities.R** - extracts all IATI activities published by external partners that are linked to a UK government funder ODA programme via an activity ID in the partner's incoming funds. This is exclusively FCDO partners currently
 
-**Dashboard 2 (script 2) - IATI (non-linked) partner activities.R** - extracts other IATI activities published by external partners, either manually identified and listed in the Inputs spreadsheet *IATI partner activities.xlsx* or identified from specific research partners like CGIAR, CABI and Bill & Melinda Gates Foundation as being funded by UK ODA
+**Script 3 - IATI (non-linked) partner activities.R** - extracts other IATI activities published by external partners, either manually identified and listed in the Inputs spreadsheet *IATI partner activities.xlsx* or identified from specific research partners like CGIAR, CABI and Bill & Melinda Gates Foundation as being funded by UK ODA
 
-**Dashboard 2 (script 3) - ODA RI awards collation.R** - master script that extracts ODA award data from public repositories (UKRI Gateway to Research, 
+**Script 4 - ODA RI awards collation.R** - master script that extracts ODA award data from public repositories (UKRI Gateway to Research, 
 NIHR Open Data), reads in other funder data (Wellcome, IATI data from previous scripts, BEIS RODA extracts), formats for consistency and collates.
 
-**Dashboard 2 (script 4) - finalisation and country extraction.R** - separates and cleans the country field for feeding into a Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
+**Script 5 - finalisation and country extraction.R** - separates and cleans the country field for feeding into a Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
+
+**Script 6 - FCDO SQL database save.R** - separates project data into 4 relational SQL tables to save to a database on FCDO's AMP server (access by request, available to FCDO internal staff)
+
 
 ### Inputs
 

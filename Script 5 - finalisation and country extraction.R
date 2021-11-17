@@ -32,7 +32,7 @@ all_projects_split_country <- countries_data %>%
 # Clean country field
 all_projects_split_country <- all_projects_split_country %>% 
   mutate(Country = str_trim(Country)) %>% 
-  mutate(Country = str_replace_all(Country, c("UK|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM"), "United Kingdom"),
+  mutate(Country = str_replace_all(Country, c("UK|Uk|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM"), "United Kingdom"),
          Country = str_replace_all(Country, c("USA|Usa|UNITED STATES|United states|United States Of America"), "United States"),
          Country = str_replace(Country, "N/A", "Unknown"),
          Country = str_replace(Country, "The Netherlands", "Netherlands"),
