@@ -287,7 +287,7 @@ iati_projects_final <- iati_projects %>%
          partner_org_name = partner,
          partner_org_country = partner_country,         
          lead_org_name = coalesce(extending_org, reporting_org),
-         lead_org_country = "",
+         lead_org_country = reporting_org_country,
          extending_org = coalesce(extending_org, reporting_org),
          status = if_else(!is.na(end_date),
                                  if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),

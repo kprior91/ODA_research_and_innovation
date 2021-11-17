@@ -283,7 +283,7 @@ extract_staff_org <- function(staff_data, person_id) {
 
 # 3 - Function to extract country from organisation ID
 # (checking GRID database as well as UKRI)
-# org_id <- "3ED60B49-9C2B-4D71-B644-96CCC7F10194"
+# org_id <- "C3F01E23-4A38-46BD-B3CE-8983CE6DBF36"
 
 extract_org_country <- function(org_id) {
   
@@ -291,6 +291,7 @@ extract_org_country <- function(org_id) {
   request <- GET(url = path)
   response <- content(request, as = "text", encoding = "UTF-8")
   response <- fromJSON(response, flatten = TRUE) 
+  org_name <- ((response$organisationOverview)$organisation)$name
   
   # Look up country from UKRI GtR 
   org_address <- ((response$organisationOverview)$organisation)$address
@@ -302,19 +303,20 @@ extract_org_country <- function(org_id) {
     org_country_ukri <- "Unknown"
   }
   
-  # Look up country from GRID database
-  grid_org_search <- data.frame(name = ((response$organisationOverview)$organisation)$name) %>% 
-    left_join(grid_institutes, by = "name") %>% 
-    left_join(grid_addresses, by = "grid_id")
-  
-  # Use GRID country over UKRI GtR one
-  org_country <- coalesce(grid_org_search$country, org_country_ukri)
+  # If unknown use other generic lookup function
+  if(org_country_ukri == "Unknown") {
+    org_country <- org_country_lookup(org_name)
+    
+  } else {
+    org_country <- org_country_ukri
+  }
   
   return(org_country)
 }
 
 
 # 4 - Master function to extract UKRI project data by ID
+# id <- "NE/W502662/1"
 
 extract_ukri_projects_by_id <- function(id) {
   
@@ -359,20 +361,19 @@ extract_ukri_projects_by_id <- function(id) {
         }
         
         # Join on country of organisation
-        staff_org_data <- staff_org_data %>% 
-          mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>% 
+        staff_org_country_data <- staff_org_data %>% 
+          mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>%
           unnest(col = person_current_org_country)
         
-        
         # Collapse staff partner orgs and countries into single records
-        if(length(staff_org_data$person_current_org_name) > 0) {
+        if(length(staff_org_country_data$person_current_org_name) > 0) {
           
-          staff_org_names <- staff_org_data %>% 
+          staff_org_names <- staff_org_country_data %>% 
             select(person_current_org_name) %>% 
             unique() %>% 
             summarise(partner_name = paste(person_current_org_name, collapse = ", "))
           
-          staff_org_countries <- staff_org_data %>% 
+          staff_org_countries <- staff_org_country_data %>% 
             select(person_current_org_country) %>% 
             filter(person_current_org_country != "Unknown") %>% 
             unique() %>% 
@@ -396,8 +397,8 @@ extract_ukri_projects_by_id <- function(id) {
     
     # Add country of lead org
     project_data <- project_data %>% 
-      mutate(lead_org_country = map(lead_org[["id"]], extract_org_country)) %>% 
-      unnest(col = lead_org_country)
+      mutate(lead_org_country = map(lead_org[["id"]], extract_org_country)) %>%
+      unnest(col = lead_org_country) 
     
     # Attach partner org info
     if(exists("org_roles_summarised")) {
@@ -427,4 +428,4 @@ extract_ukri_projects_by_id <- function(id) {
   return(project_data)
 }
 
-
+# test <- extract_ukri_projects_by_id(id)
