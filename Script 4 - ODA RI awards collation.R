@@ -67,7 +67,7 @@ ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>%
 ### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
 
 # Join GCRF/Newton project IDs to other ODA IDs 
-ukri_projects_ids <- ukri_projects_ids %>% 
+ukri_projects_ids_full <- ukri_projects_ids %>% 
   rbind(ukri_gcrf_newton_ids)
 
 
@@ -101,11 +101,11 @@ saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 
 # Join to fund and funder info from original list
 ukri_projects_by_id_with_id <- ukri_projects_by_id %>% 
-  left_join(select(ukri_projects_ids, 
+  left_join(select(ukri_projects_ids_full, 
                    iati_id = `Funder IATI ID`, Fund, Funder,`GtR ID`), by = c("gtr_id" = "GtR ID")) 
 
 # See which awards from input list have not been found
-missing_awards <- select(ukri_projects_ids, `GtR ID`) %>% 
+missing_awards <- select(ukri_projects_ids_full, `GtR ID`) %>% 
   left_join(select(ukri_projects_by_id_with_id, gtr_id, title), by = c("GtR ID" = "gtr_id")) %>% 
   filter(is.na(title)) %>% 
   unique()
@@ -161,7 +161,8 @@ ukri_projects_final <- ukri_projects_final %>%
 
 ukri_projects_final <- ukri_projects_final %>% 
   group_by(across(c(-partner_org_name))) %>% 
-  slice(1)
+  slice(1) %>% 
+  ungroup()
 
 # Save as R file (to read back in if needed)
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
@@ -514,7 +515,13 @@ all_projects <- rbind(ukri_projects_with_countries, nihr_projects_final,
                       iati_projects_final, wellcome_grants_final,
                       collated_spreadsheet_data,
                       roda_extract_gcrf_final, roda_extract_newton_final) %>% 
-                unique()
+                unique() %>% 
+                ungroup()
+
+# Add FCDO DevTracker links in absence of other public source
+all_projects <- all_projects %>% 
+  mutate(link = if_else((str_detect(iati_id, "GB-GOV-1-") | str_detect(iati_id, "GB-1-")) & is.na(link),
+                        paste0("https://devtracker.fcdo.gov.uk/projects/", iati_id, "/summary"), link))
 
 # Save as R file (to read back in if needed)
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
@@ -528,10 +535,6 @@ test3 <- filter(all_projects, str_detect(Funder, "Food"))
 
 # Example UKRI project funded by BEIS GCRF, FCDO and DHSC
 test4 <- filter(all_projects, str_detect(id, "MR/M009211/1"))
-
-test3 <- filter(ukri_projects_by_fund_with_id, str_detect(`GtR ID`, "MR/M009211/1"))
-test2 <- filter(ukri_projects_ids, str_detect(`GtR ID`, "MR/M009211/1"))
-test4 <- filter(ukri_projects_final, str_detect(id, "MR/N006267/1"))
 
 
 

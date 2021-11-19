@@ -3,13 +3,32 @@
 ### 1) Set up ---
 
 # Define countries for reports
-country_list <- c("Burundi", "Comoros", "Djibouti", "Ethiopia", "Eritrea", "Kenya",
-                  "Madagascar", "Malawi", "Mauritius", "Mozambique", "Réunion", "Rwanda", 
-                  "Seychelles", "Somalia", "Somaliland", "Tanzania", "Uganda", "Zambia", "Zimbabwe")
 
-# Read in datasets
-all_projects <- readRDS("Outputs/all_projects.rds") 
-all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
+## East Africa
+# country_list <- c("Burundi", "Comoros", "Djibouti", "Ethiopia", "Eritrea", "Kenya",
+#                   "Madagascar", "Malawi", "Mauritius", "Mozambique", "Réunion", "Rwanda", 
+#                   "Seychelles", "Somalia", "Somaliland", "Tanzania", "Uganda", "Zambia", "Zimbabwe")
+
+## Indo-Pacific
+country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Philippines",
+                  "Singapore", "Thailand", "Vietnam")
+
+
+# Read in datasets and abbrieviate funder names
+
+all_projects <- readRDS("Outputs/all_projects.rds") %>% 
+  mutate(Funder = case_when(
+    Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
+    Funder == "Department of Health and Social Care" ~ "DHSC",
+    Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
+  ))
+
+all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") %>% 
+  mutate(Funder = case_when(
+    Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
+    Funder == "Department of Health and Social Care" ~ "DHSC",
+    Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
+  )) 
 
 
 ### 2) Output reports for each country ----
@@ -26,7 +45,6 @@ table_st <- createStyle(fontSize = 8, fontName = "Arial",
                         wrapText = TRUE,
                         valign = "top")
 
-
 for(i in 1:length(country_list)) {
 
     print(paste0(i, " - ", country_list[i]))
@@ -34,25 +52,12 @@ for(i in 1:length(country_list)) {
     # Extract project data for selected country
     country_project_ids <- all_projects_tidied %>% 
       filter(Country == country_list[i]) %>% 
-      select(id) %>% 
-      unique()
-    
-    country_project_data <- all_projects %>% 
-      filter(id %in% country_project_ids$id)
-    
-    # Prepare output report fields
-    output_report <- country_project_data %>% 
       mutate(Start = format(as.Date(start_date), format = "%Y"),
              End = format(as.Date(end_date), format = "%Y"),
-             Funder = case_when(
-               Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
-               Funder == "Department of Health and Social Care" ~ "DHSC",
-               Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-             ),
-             Fund = if_else(str_detect(Fund, "FCDO Research & Innovation|FCDO fully"), "FCDO Research - Programmes", Fund),
-             Fund = if_else(str_detect(Fund, "FCDO partially"), "FCDO Research - Partnerships", Fund),
-             link = coalesce(link, "")) %>% 
-      select(Funder, Fund, 
+             link = coalesce(link, ""))
+    
+    output_report <- country_project_ids %>% 
+      select(Funder, Fund, Programme = funder_programme,
              Title = title, Start, End, Description = abstract,
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
              `Web Link` = link) %>% 
@@ -60,11 +65,6 @@ for(i in 1:length(country_list)) {
       slice(1) %>% 
       ungroup() %>% 
       unique()
-    
-    # Join on funder programme names
-    output_report <- output_report %>% 
-      left_join(select(all_projects_tidied, title, funder_programme) %>% unique(), by = c("Title" = "title")) %>% 
-      rename(Programme = funder_programme)
     
     # Summarise funders on co-funded projects
     co_funded_projects <- output_report %>% 
@@ -105,7 +105,7 @@ for(i in 1:length(country_list)) {
 }
 
 # Resave Excel file
-saveWorkbook(wb, "Outputs//East Africa ODA programmes - Oct21.xlsx", overwrite = TRUE)
+saveWorkbook(wb, "Outputs//Indo-Pacific ODA programmes - Nov21.xlsx", overwrite = TRUE)
 
 
 

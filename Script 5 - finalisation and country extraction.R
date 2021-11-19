@@ -32,15 +32,17 @@ all_projects_split_country <- countries_data %>%
 # Clean country field
 all_projects_split_country <- all_projects_split_country %>% 
   mutate(Country = str_trim(Country)) %>% 
-  mutate(Country = str_replace_all(Country, c("UK|Uk|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM"), "United Kingdom"),
-         Country = str_replace_all(Country, c("USA|Usa|UNITED STATES|United states|United States Of America"), "United States"),
-         Country = str_replace(Country, "N/A", "Unknown"),
-         Country = str_replace(Country, "The Netherlands", "Netherlands"),
-         Country = str_replace(Country, "The Philippines", "Philippines"),
-         Country = if_else(str_detect(Country, "Ivoire"), "Ivory Coast", Country),
-         Country = str_replace(Country, "Republic of Congo", "Congo Republic"),
-         Country = if_else(str_detect(Country, "Hong Kong"), "Hong Kong", Country),
-         Country = if_else(str_detect(Country, "Viet Nam"), "Vietnam", Country)) %>% 
+  mutate(Country = case_when(
+           str_detect(Country, "UK|Uk|Scotland|Wales|United kingdom|England|Northern Ireland|UNITED KINGDOM") == TRUE ~ "United Kingdom",
+           str_detect(Country, "USA|Usa|UNITED STATES|United states|United States Of America|US") == TRUE ~ "United States",
+           str_detect(Country, "Netherlands") == TRUE ~ "Netherlands",
+           str_detect(Country, "Philippines") == TRUE ~ "Philippines",
+           str_detect(Country, "Ivoire") == TRUE ~ "Ivory Coast",
+           str_detect(Country, "Republic of Congo") == TRUE ~ "Congo Republic",
+           str_detect(Country, "Hong Kong") == TRUE ~ "Hong Kong",
+           str_detect(Country, "Viet Nam") == TRUE ~ "Vietnam",
+           str_detect(Country, "Lao") == TRUE ~ "Laos",
+           TRUE ~ Country)) %>% 
   unique() %>% 
   filter(!(Country %in% c("", "NA", "Unknown")) & !is.na(Country)) %>% 
   arrange(id)
@@ -154,7 +156,8 @@ all_projects_tidied <- all_projects_tidied %>%
 # Manually edit country info for Chevening Scholarships
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
-         Country = if_else(Fund == "Chevening Scholarships" & country_type == 2, "United Kingdom", Country))
+         Country = if_else(Fund == "Chevening Scholarships" & country_type == 2, "United Kingdom", Country),
+         start_date = if_else(Fund == "Chevening Scholarships", "", start_date))
 
 # Remove non-research partners
 # (linked partner data from non-RED managed programmes)
@@ -207,7 +210,7 @@ results_sheet <- sheet_write(all_projects_tidied,
                              ss = results,
                              sheet = "ODA_RI_projects")
 
-
+View(all_projects_tidied$Country)
 
 # 7) Testing ---------------------------------------
 
