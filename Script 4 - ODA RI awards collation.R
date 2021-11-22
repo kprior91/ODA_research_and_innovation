@@ -80,7 +80,7 @@ ukri_projects_by_id <- data.frame()
 
 n <- 1 # set counter
 
-for (id in ukri_projects_ids$`GtR ID`) {
+for (id in ukri_projects_ids_full$`GtR ID`) {
   
   print(paste0(n, " - ", id))
   
@@ -444,65 +444,70 @@ rm(file_list)
 
 # Reformat to match other datasetS
 roda_extract_gcrf_final <- roda_extract_gcrf %>% 
-  rename(id = `Extending organisation - award ID`,
-         abstract = `Award description`,
-         title = `Award title`,
-         amount = `Award amount (£)`,
-         recipient_country = `Beneficiary country`,
-         extending_org = `Extending organisation - name`,
-         lead_org_name = `Lead organisation - name`,
-         lead_org_country = `Lead organisation - country`,
-         partner_org_name = `Implementing partner(s) - name`,
-         partner_org_country = `Implementing partner(s) - country`,
-         iati_id = `Funder programme - IATI ID`,
-         link = `Data source`
+  rename(id = `RODA identifier`,
+         abstract = Description,
+         title = Title,
+         amount = Amount,
+         recipient_country = `Recipient country`,
+         extending_org = `Delivery partner`,
+         lead_org_name = `Lead Organisation`
   ) %>% 
-  mutate(start_date = as.character(as.Date(`Start date`, "%d %B %Y")),
-         end_date = as.character(as.Date(`End date`, "%d %B %Y")),
-         currency = coalesce(Currency, "GBP"),
-         status = if_else(`Status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
-                          if_else(`Status` %in% c("Completed"), "Closed", 
-                                  if_else(`Status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
+  mutate(Fund = "Global Challenges Research Fund (GCRF)",
+         Funder = "Department for Business, Energy and Industrial Strategy",
+         start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
+         end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
+         lead_org_country = map(lead_org_name, org_country_lookup),
+         partner_org_name = "",
+         partner_org_country = "",
+         iati_id = "",
+         currency = "GBP",
+         status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(Status %in% c("Completed"), "Closed", 
+                                  if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = "",
          period_end = "",
          subject = "",
-         last_updated = quarter_end_date
+         last_updated = quarter_end_date,
+         link = ""
   ) %>% 
-    # suppress display of end dates that have passed
-  mutate(end_date = if_else(Sys.Date() <= end_date, end_date, "")) %>%
+  unnest(cols = lead_org_country) %>% 
+    # suppress display of active project end dates that have passed
+  mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, "")) %>%
     # remove unecessary variables
-  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`,  -Status,
-         -`Start date`, -`End date`)
+  select(-Level, -`Recipient region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
+         -`Actual end date`)
 
 
 roda_extract_newton_final <- roda_extract_newton %>% 
-  rename(id = ID,
+  rename(id = `RODA ID`,
          title = Title,
          abstract = Description,
-         amount = `Value (Indicative)`,
+         amount = Amount,
          recipient_country = `Recipient country`,
-         extending_org = `Lead Organisation`) %>% 
+         extending_org = `Delivery partner`,
+         lead_org_name = `Lead Organisation`,
+         partner_org_name = `Partner organisations`) %>% 
   mutate(Fund = "Newton Fund",
          Funder = "Department for Business, Energy and Industrial Strategy",
-         lead_org_name = "",
-         lead_org_country = "",
-         partner_org_name = "",
+         lead_org_country = map(lead_org_name, org_country_lookup),
          partner_org_country = "",
          iati_id = "",
          link = "",
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          currency = "GBP",
+         status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(Status %in% c("Completed"), "Closed", 
+                                  if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = "",
          period_end = "",
          subject = "",
          last_updated = quarter_end_date) %>% 
-  mutate(status = if_else(!is.na(end_date),
-                        if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown")) %>%
+  unnest(cols = lead_org_country) %>%
   # suppress display of end dates that have passed
   mutate(end_date = if_else(Sys.Date() <= end_date, end_date, "")) %>%
   
-  select(-`Delivery partner`, -`Recipient region`, -`Planned start date`,
+  select(-Level, -`Recipient region`, -`Planned start date`, -Status,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
 
 rm(roda_extract_gcrf)

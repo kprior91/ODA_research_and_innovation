@@ -2,7 +2,7 @@
 ### Set dates ----
 
 # Set quarter end date
-quarter_end_date <- as.Date("2021-06-30")
+quarter_end_date <- as.Date("2021-09-30")
 
 
 ### Install packages ----
@@ -95,8 +95,8 @@ ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", shee
 wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 
 # BEIS RODA GCRF/Newton extracts
-roda_extract_gcrf <- read_excel("Inputs/BEIS RODA - GCRF non-UKRI Q1-21-22.xlsx", sheet = 2)
-roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q1_2021-2022.xlsx")
+roda_extract_gcrf <- read_excel("Inputs/BEIS_GCRF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
+roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
 
 
 ### Functions -----
