@@ -294,7 +294,14 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       mutate(org_country = coalesce(org_country_iati, org_country_other)) %>% 
       select(-org_country_iati, -org_country_other)
       
-  # Separate implementing orgs
+  # Save implementing orgs with country to file
+    org_names_and_locations <- activity_list_unnest_4 %>% 
+      select(project_id = iati_identifier,
+             organisation_name = text,
+             organisation_country = org_country) %>% 
+      mutate(organisation_role = 2)
+    
+  # Collapse implementing orgs
     activity_list_unnest_4_partner_names <- activity_list_unnest_4 %>% 
       select(iati_identifier, text) %>% 
       filter(!is.na(text)) %>% 
@@ -345,7 +352,18 @@ activity_list_unnest_5 <- partner_activity_comb %>%
           mutate(reporting_org_country = coalesce(org_country_iati, org_country_other)) %>% 
           select(-org_country_iati, -org_country_other)
 
-
+    # Add on to org file to save
+    org_names_and_locations <- activity_list_unnest_5 %>% 
+          select(project_id = iati_identifier,
+                 organisation_name = reporting_org,
+                 organisation_country = reporting_org_country) %>% 
+          mutate(organisation_role = 1) %>% # leading
+          rbind(org_names_and_locations) %>% 
+          unique()
+    
+    # Save to file
+    saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
+    
 # 6) Unlist and aggregate committments
 activity_list_unnest_6 <- partner_activity_comb %>% 
   filter(lengths(budget) != 0) %>% 

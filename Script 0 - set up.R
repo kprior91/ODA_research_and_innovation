@@ -363,7 +363,8 @@ extract_ukri_projects_by_id <- function(id) {
         # Join on country of organisation
         staff_org_country_data <- staff_org_data %>% 
           mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>%
-          unnest(col = person_current_org_country)
+          unnest(col = person_current_org_country) %>% 
+          mutate(organisation_role = 2) # partner
         
         # Collapse staff partner orgs and countries into single records
         if(length(staff_org_country_data$person_current_org_name) > 0) {
@@ -410,6 +411,19 @@ extract_ukri_projects_by_id <- function(id) {
         mutate(partner_org_name = "",
                partner_org_country = "")
     }
+    
+    # Write org names and locations to file
+    org_names_and_locations <- org_names_and_locations %>% 
+      rbind(select(staff_org_country_data,
+                   project_id = projects[["grantReference"]],
+                   organisation_role,
+                   organisation_name = person_current_org_name,
+                   organisation_country = person_current_org_country)) %>% 
+      rbind(select(project_data,
+                   project_id = gtr_id,
+                   organisation_name = lead_org_name,
+                   organisation_country = lead_org_country) %>% 
+            mutate(organisation_role = 1))
     
     # Keep desired fields
     project_data <- project_data %>% 

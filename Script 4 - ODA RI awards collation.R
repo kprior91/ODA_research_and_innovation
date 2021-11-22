@@ -1,5 +1,5 @@
 #####################################
-# Script 3 
+# Script 4 
 # Extract and collate ODA R&I award level data from
 # - UKRI Gateway to Research
 # - NIHR Open Data
@@ -9,6 +9,8 @@
 # - BEIS (RODA)
 #####################################
 
+# Read in org names and countries dataset
+org_names_and_locations <- readRDS(file = "Outputs/org_names_and_locations.rds")
 
 # 1) Extract UKRI projects -------------------------------------------
 
@@ -245,6 +247,14 @@ nihr_projects_final <- nihr_projects %>%
 # Add NIHR link to awards
 nihr_projects_final <- nihr_projects_final %>% 
   mutate(link = paste0("https://fundingawards.nihr.ac.uk/award/", id))
+
+# Write org names and countries to file
+org_names_and_locations <- org_names_and_locations %>% 
+  rbind(select(nihr_projects_final,
+               project_id = id,
+               organisation_name = lead_org_name,
+               organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1))
 
 rm(nihr_projects)
 rm(request)
