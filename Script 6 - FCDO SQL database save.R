@@ -3,6 +3,8 @@
 # Read in final dataset from scripts 4 and 5
 all_projects <- readRDS("Outputs/all_projects.rds") 
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
+org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
+
 
 # Connect to ODA RI Projects database on development server
 
@@ -71,22 +73,7 @@ funder_table <- all_projects %>%
 
 # 3) Create organisation table ----
 
-organisation_table <- all_projects %>% 
-  select(project_id = id, 
-         lead_org_name, 
-         lead_org_country,
-         partner_org_name,
-         partner_org_country) %>% 
-  unique()
-
-organisation_table <- organisation_table %>% 
-  gather(organisation_role, organisation_name, -project_id, -lead_org_country, -partner_org_country) %>% 
-  mutate(organisation_country = coalesce(lead_org_country, partner_org_country),
-         organisation_role = if_else(str_detect(organisation_role, "lead"), 1,2)) %>% 
-  select(-lead_org_country, -partner_org_country) %>%
-  filter(organisation_name != "") %>% 
-  unique()
-
+organisation_table <- org_names_and_locations
 
 # 4) Create country table ----
 

@@ -10,7 +10,7 @@
 #####################################
 
 # Read in org names and countries dataset
-org_names_and_locations <- readRDS(file = "Outputs/org_names_and_locations.rds")
+org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.rds")
 
 # 1) Extract UKRI projects -------------------------------------------
 
@@ -77,6 +77,7 @@ ukri_projects_ids_full <- ukri_projects_ids %>%
 
 # Create empty dataset to hold projects
 ukri_projects_by_id <- data.frame()
+org_names_and_locations_2 <- data.frame()
 
 # Run project info extraction over all GtR projects
 
@@ -85,18 +86,31 @@ n <- 1 # set counter
 for (id in ukri_projects_ids_full$`GtR ID`) {
   
   print(paste0(n, " - ", id))
-  
+
   data <- extract_ukri_projects_by_id(id)
   
-  ukri_projects_by_id <- ukri_projects_by_id %>% 
-    rbind(data)
+  # Separate elements of list
+  project_data <- data[[1]]
+  org_data <- data[[2]]
   
+  # Add new data rows to existing tables
+  ukri_projects_by_id <- ukri_projects_by_id %>% 
+    rbind(project_data)
+  
+  org_names_and_locations_2 <- org_names_and_locations_2 %>% 
+    rbind(org_data)
+  
+  # Increment counter for next cycle
   n <- n+1
   
 }
 
 saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 # ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
+
+# Save org names and countries to file
+saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
+# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
 
 
 ### E - Add on fund and funder labels
@@ -249,12 +263,11 @@ nihr_projects_final <- nihr_projects_final %>%
   mutate(link = paste0("https://fundingawards.nihr.ac.uk/award/", id))
 
 # Write org names and countries to file
-org_names_and_locations <- org_names_and_locations %>% 
-  rbind(select(nihr_projects_final,
-               project_id = id,
-               organisation_name = lead_org_name,
-               organisation_country = lead_org_country) %>% 
-          mutate(organisation_role = 1))
+org_names_and_locations_3 <- nihr_projects_final %>% 
+          select(project_id = id,
+                 organisation_name = lead_org_name,
+                 organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1)
 
 rm(nihr_projects)
 rm(request)
@@ -393,6 +406,36 @@ wellcome_grants_final <- wellcome_grants_formatted %>%
          end_date = as.character(end_date),
          link = "https://wellcome.org/grant-funding/funded-people-and-projects")
 
+# Write lead org names and countries to file
+org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+  rbind(select(wellcome_grants_final,
+               project_id = id,
+               organisation_name = lead_org_name,
+               organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1))
+
+# Write partner org names and countries to file (where simple to do)
+wellcome_partners <- wellcome_grants_final %>% 
+  select(id, partner_org_name, partner_org_country) %>% 
+  # Exclude missings, multiple and miscellaneous partners
+  filter(!is.na(partner_org_name),
+         !str_detect(partner_org_name, "Misc")) %>% 
+  # Separate rows with multiple partners
+  separate_rows(partner_org_name, sep = ",", convert = FALSE) %>% 
+  mutate(partner_org_name = str_trim(partner_org_name)) %>% 
+  mutate(new_country = map(partner_org_name, org_country_lookup)) %>% 
+  unnest(cols = new_country) %>% 
+  mutate(partner_org_country = coalesce(new_country, partner_org_country)) %>% 
+  filter(!str_detect(partner_org_country, ",")) %>% 
+  select(-new_country)
+
+org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+  rbind(select(wellcome_partners,
+               project_id = id,
+               organisation_name = partner_org_name,
+               organisation_country = partner_org_country) %>% 
+          mutate(organisation_role = 2))
+
 rm(wellcome_grants)
 rm(wellcome_grants_formatted)
 
@@ -445,6 +488,29 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
 saveRDS(collated_spreadsheet_data, file = "Outputs/collated_spreadsheet_data.rds")
 # collated_spreadsheet_data <- readRDS("Outputs/collated_spreadsheet_data.rds") 
 
+# Write lead org names and countries to file
+org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+  rbind(select(collated_spreadsheet_data,
+               project_id = id,
+               organisation_name = lead_org_name,
+               organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1))
+
+# Write partner org names and countries to file (where simple to do)
+spreadsheet_partners <- collated_spreadsheet_data %>% 
+  select(id, partner_org_name, partner_org_country) %>% 
+  # Exclude missings, multiple and miscellaneous partners
+  filter(!is.na(partner_org_name),
+         !str_detect(partner_org_name, ",|;"),
+         !str_detect(partner_org_country, ",|;|N/A")) 
+
+org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+  rbind(select(spreadsheet_partners,
+               project_id = id,
+               organisation_name = partner_org_name,
+               organisation_country = partner_org_country) %>% 
+          mutate(organisation_role = 2))
+
 rm(partner_spreadsheet_data)
 rm(data_list)
 rm(file_list)
@@ -485,7 +551,7 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
   mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, "")) %>%
     # remove unecessary variables
   select(-Level, -`Recipient region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
-         -`Actual end date`)
+         -`Actual end date`, -Status)
 
 
 roda_extract_newton_final <- roda_extract_newton %>% 
@@ -520,6 +586,20 @@ roda_extract_newton_final <- roda_extract_newton %>%
   select(-Level, -`Recipient region`, -`Planned start date`, -Status,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
 
+# Write lead org names and countries to file
+org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+  rbind(select(roda_extract_gcrf_final,
+               project_id = id,
+               organisation_name = lead_org_name,
+               organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1)) %>% 
+  
+  rbind(select(roda_extract_newton_final,
+               project_id = id,
+               organisation_name = lead_org_name,
+               organisation_country = lead_org_country) %>% 
+          mutate(organisation_role = 1))
+
 rm(roda_extract_gcrf)
 rm(roda_extract_newton)
 
@@ -542,6 +622,13 @@ all_projects <- all_projects %>%
 saveRDS(all_projects, file = "Outputs/all_projects.rds")
 # all_projects <- readRDS("Outputs/all_projects.rds") 
 
+# Save org names and countries to file
+org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locations_2, org_names_and_locations_3) %>% 
+  mutate(organisation_name = str_trim(organisation_name)) %>% 
+  filter(!is.na(organisation_name)) %>% 
+  unique()
+
+saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
 
 # 8) CHECKING ----
 test1 <- filter(all_projects, str_detect(extending_org, "Food"))

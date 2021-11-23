@@ -1,5 +1,5 @@
 .Rproj.user/*
+.RData
+.Rhistory
 Archive/
-Docs/
-.Rproj.user
-Outputs/*
+

@@ -120,7 +120,6 @@ partner_activities <- org_activity_list %>%
 
 # Save to Rdata file
 saveRDS(partner_activities, file = "Outputs/partner_activities.rds")
-# Restore the object
 # partner_activities <- readRDS(file = "Outputs/partner_activities.rds")
 
 
@@ -282,9 +281,9 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       filter(role.name == "Implementing") %>% 
       mutate(
         org_country_iati = case_when(        
-          str_detect(ref, "GB") ~ "United Kingdom", 
-          str_detect(ref, "US") ~ "United States", 
-          str_detect(ref, "NL") ~ "Netherlands",
+          str_detect(ref, "GB-") ~ "United Kingdom", 
+          str_detect(ref, "US-") ~ "United States", 
+          str_detect(ref, "NL-") ~ "Netherlands",
           str_detect(ref, "CA-") ~ "Canada",
           str_detect(ref, "IN-") ~ "India",
           str_detect(ref, "KE-") ~ "Kenya",
@@ -295,11 +294,11 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       select(-org_country_iati, -org_country_other)
       
   # Save implementing orgs with country to file
-    org_names_and_locations <- activity_list_unnest_4 %>% 
+    org_names_and_locations_1 <- activity_list_unnest_4 %>% 
       select(project_id = iati_identifier,
              organisation_name = text,
              organisation_country = org_country) %>% 
-      mutate(organisation_role = 2)
+      mutate(organisation_role = 2) 
     
   # Collapse implementing orgs
     activity_list_unnest_4_partner_names <- activity_list_unnest_4 %>% 
@@ -340,9 +339,9 @@ activity_list_unnest_5 <- partner_activity_comb %>%
     activity_list_unnest_5 <- activity_list_unnest_5 %>% 
         mutate(
           org_country_iati = case_when(        
-            str_detect(reporting_org_ref, "GB") ~ "United Kingdom", 
-            str_detect(reporting_org_ref, "US") ~ "United States", 
-            str_detect(reporting_org_ref, "NL") ~ "Netherlands",
+            str_detect(reporting_org_ref, "GB-") ~ "United Kingdom", 
+            str_detect(reporting_org_ref, "US-") ~ "United States", 
+            str_detect(reporting_org_ref, "NL-") ~ "Netherlands",
             str_detect(reporting_org_ref, "CA-") ~ "Canada",
             str_detect(reporting_org_ref, "IN-") ~ "India",
             str_detect(reporting_org_ref, "KE-") ~ "Kenya",
@@ -353,16 +352,13 @@ activity_list_unnest_5 <- partner_activity_comb %>%
           select(-org_country_iati, -org_country_other)
 
     # Add on to org file to save
-    org_names_and_locations <- activity_list_unnest_5 %>% 
+    org_names_and_locations_1 <- activity_list_unnest_5 %>% 
           select(project_id = iati_identifier,
                  organisation_name = reporting_org,
                  organisation_country = reporting_org_country) %>% 
           mutate(organisation_role = 1) %>% # leading
-          rbind(org_names_and_locations) %>% 
+          rbind(org_names_and_locations_1) %>% 
           unique()
-    
-    # Save to file
-    saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
     
 # 6) Unlist and aggregate committments
 activity_list_unnest_6 <- partner_activity_comb %>% 
@@ -462,6 +458,9 @@ activity_list <- activity_list %>%
 # Save to Rdata file
 saveRDS(activity_list, file = "Outputs/partner_activity_list.rds")
 # activity_list <- readRDS(file = "Outputs/partner_activity_list.rds")
+
+# Save org names and countries to file
+saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1.rds")
 
 # Check funds, funders
 table(activity_list$fund)

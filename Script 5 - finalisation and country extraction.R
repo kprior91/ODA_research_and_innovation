@@ -210,7 +210,6 @@ results_sheet <- sheet_write(all_projects_tidied,
                              ss = results,
                              sheet = "ODA_RI_projects")
 
-View(all_projects_tidied$Country)
 
 # 7) Testing ---------------------------------------
 

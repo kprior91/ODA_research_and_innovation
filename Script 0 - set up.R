@@ -75,7 +75,7 @@ grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>%
 grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
 
 # Country names
-countries <- c(countrycode::codelist$country.name.en, "UK")
+countries <- countrycode::codelist$country.name.en
 countries_string <- paste0(str_to_lower(countries), collapse = "|")
 
 
@@ -316,7 +316,9 @@ extract_org_country <- function(org_id) {
 
 
 # 4 - Master function to extract UKRI project data by ID
-# id <- "NE/W502662/1"
+# id <- "AH/T007362/1"
+
+test <- filter(org_names_and_locations, str_detect(project_id, "NE/W502662/1"))
 
 extract_ukri_projects_by_id <- function(id) {
   
@@ -332,6 +334,8 @@ extract_ukri_projects_by_id <- function(id) {
     str_replace_all("Data last updated:  ", "") %>% 
     as.Date(format = "%d %b %Y")
   
+  # Create blank org table for output
+  org_table <- data.frame()
   
   if(length(data) > 0) {
     
@@ -363,12 +367,21 @@ extract_ukri_projects_by_id <- function(id) {
         # Join on country of organisation
         staff_org_country_data <- staff_org_data %>% 
           mutate(person_current_org_country = map(person_current_org_id, extract_org_country)) %>%
-          unnest(col = person_current_org_country) %>% 
-          mutate(organisation_role = 2) # partner
+          unnest(col = person_current_org_country) 
         
         # Collapse staff partner orgs and countries into single records
         if(length(staff_org_country_data$person_current_org_name) > 0) {
           
+          # Keep staff org names and countries to output
+          org_table <- staff_org_country_data %>% 
+                  mutate(project_id = projects[["grantReference"]],
+                         organisation_role = 2) %>% 
+                  select(project_id,
+                         organisation_role,
+                         organisation_name = person_current_org_name,
+                         organisation_country = person_current_org_country)
+          
+          # Collapse org names and locations
           staff_org_names <- staff_org_country_data %>% 
             select(person_current_org_name) %>% 
             unique() %>% 
@@ -412,13 +425,8 @@ extract_ukri_projects_by_id <- function(id) {
                partner_org_country = "")
     }
     
-    # Write org names and locations to file
-    org_names_and_locations <- org_names_and_locations %>% 
-      rbind(select(staff_org_country_data,
-                   project_id = projects[["grantReference"]],
-                   organisation_role,
-                   organisation_name = person_current_org_name,
-                   organisation_country = person_current_org_country)) %>% 
+    # Write lead org name and country to file
+    org_table <- org_table %>% 
       rbind(select(project_data,
                    project_id = gtr_id,
                    organisation_name = lead_org_name,
@@ -439,7 +447,7 @@ extract_ukri_projects_by_id <- function(id) {
     project_data <- data.frame()
   }
   
-  return(project_data)
+  return(list(project_data, org_table))
 }
 
 # test <- extract_ukri_projects_by_id(id)

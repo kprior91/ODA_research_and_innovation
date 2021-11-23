@@ -49,9 +49,15 @@ for(i in 1:length(country_list)) {
 
     print(paste0(i, " - ", country_list[i]))
   
+    # (workaround until overseas partner info on NIHR Open Data)
+    nihr_country_projects <- nihr_projects_final %>% 
+      filter(str_detect(title, country_list[i]) | str_detect(abstract, country_list[i]),
+             status == "Active")
+  
     # Extract project data for selected country
     country_project_ids <- all_projects_tidied %>% 
-      filter(Country == country_list[i]) %>% 
+      filter(Country == country_list[i] |
+             id %in% nihr_country_projects$id) %>% 
       mutate(Start = format(as.Date(start_date), format = "%Y"),
              End = format(as.Date(end_date), format = "%Y"),
              link = coalesce(link, ""))
