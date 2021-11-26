@@ -28,7 +28,16 @@ all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") %>%
     Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
     Funder == "Department of Health and Social Care" ~ "DHSC",
     Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-  )) 
+  ),
+    extending_org = case_when(
+      extending_org == "BC" ~ "British Council",
+      extending_org == "MO" ~ "Met Office",
+      extending_org == "AMS" ~ "Academy of Medical Sciences",
+      extending_org == "RS" ~ "Royal Society",
+      extending_org == "BA" ~ "British Academy",
+      extending_org == "RAE" ~ "Royal Academy of Engineering",
+      extending_org == "UKSA" ~ "UK Space Agency"
+    )) 
 
 
 ### 2) Output reports for each country ----
@@ -58,14 +67,17 @@ for(i in 1:length(country_list)) {
     country_project_ids <- all_projects_tidied %>% 
       filter(Country == country_list[i] |
              id %in% nihr_country_projects$id) %>% 
-      mutate(Start = format(as.Date(start_date), format = "%Y"),
-             End = format(as.Date(end_date), format = "%Y"),
+      mutate(Start = as.numeric(as.character(format(as.Date(start_date), format = "%Y"))),
+             End = as.numeric(as.character(format(as.Date(end_date), format = "%Y"))),
              link = coalesce(link, ""))
     
     output_report <- country_project_ids %>% 
+      mutate(lead_org_name = coalesce(lead_org_name, extending_org)) %>% 
       select(Funder, Fund, Programme = funder_programme,
              Title = title, Start, End, Description = abstract,
+             `Beneficiary Country` = recipient_country,
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
+             `Value (£)` = amount,
              `Web Link` = link) %>% 
       group_by(Title, Funder) %>% 
       slice(1) %>% 
@@ -87,15 +99,19 @@ for(i in 1:length(country_list)) {
       group_by(Title) %>% 
       # Keep one row per project title
       slice(1) %>% 
-      select(Funder, Fund, Programme, Title, Start, End, Description, `Lead Organisation`, `Partner Organisations`, `Web Link`)
+      select(Funder, Fund, Programme, Title, Start, End, Description, `Beneficiary Country`,
+             `Lead Organisation`, `Partner Organisations`, `Value (£)`, `Web Link`)
   
+    # Format numerical value column
+    class(output_report$`Value (£)`) <- "comma"
+    
     # Add country dataset to output list
     openxlsx::addWorksheet(wb, sheetName = country_list[i])
     openxlsx::writeData(wb, sheet = i, x = output_report, 
                         headerStyle = header_st,
                         borderStyle = "thin")
     # Add font style
-    addStyle(wb, sheet = i, table_st, rows = 2:200, cols = 1:10, gridExpand = TRUE, stack = TRUE)
+    addStyle(wb, sheet = i, table_st, rows = 2:200, cols = 1:12, gridExpand = TRUE, stack = TRUE)
     
     # Identify titles and hyperlinks
     hyperlinks <- output_report$`Web Link`
@@ -103,10 +119,10 @@ for(i in 1:length(country_list)) {
     class(hyperlinks) <- "hyperlink"
     
     # Write hyperlinks
-    writeData(wb, sheet = i, x = hyperlinks, startRow = 2, startCol = 10, colNames = FALSE)
+    writeData(wb, sheet = i, x = hyperlinks, startRow = 2, startCol = 12, colNames = FALSE)
     
     # Set column widths
-    setColWidths(wb, sheet = i, cols = 1:10, widths = c(10,25,30,40,6,6,60,30,30,50))
+    setColWidths(wb, sheet = i, cols = 1:12, widths = c(10,25,30,40,6,6,60,30,30,30,10,50))
     
 }
 
