@@ -66,7 +66,7 @@ grid_institutes <- read.csv("Inputs/GRID tables/institutes.csv") %>%
   mutate(name = str_to_lower(name)) %>% 
   unique()  %>% 
   # Remove common organisation names
-  filter(!(name %in% c("Ministry of Health", "Ministry of Public Health")))
+  filter(!(name %in% c("ministry of health", "ministry of public health")))
 
 grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>% 
   select(grid_id, country, country_code) %>% 
