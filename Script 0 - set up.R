@@ -318,8 +318,6 @@ extract_org_country <- function(org_id) {
 # 4 - Master function to extract UKRI project data by ID
 # id <- "AH/T007362/1"
 
-test <- filter(org_names_and_locations, str_detect(project_id, "NE/W502662/1"))
-
 extract_ukri_projects_by_id <- function(id) {
   
   path <- paste0("http://gtr.ukri.org/projects?ref=", id)

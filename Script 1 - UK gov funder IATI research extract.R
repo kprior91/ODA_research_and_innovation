@@ -57,9 +57,9 @@ saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final.rds")
 # (via the R&I "tag" field)
 
 # Unnest tags
-uk_gov_ri_programmes <- uk_gov_list_final %>% 
-  unnest(col = tag,
-         keep_empty = TRUE) %>% 
+uk_gov_ri_programmes <- uk_gov_list_final %>%
+  filter(lengths(tag) != 0) %>%
+  unnest(col = tag) %>% 
   select(-narrative, -vocabulary_uri, -vocabulary.code, -vocabulary.name)
 
 # Save list of tagged research & innovation programmes
@@ -95,6 +95,7 @@ gov_list_base <- uk_gov_list_filtered %>%
 
 # A) Unlist activity title and description
 gov_list_unnest_1 <- uk_gov_list_filtered %>% 
+  filter(lengths(title.narrative) != 0) %>%
   unnest(cols = title.narrative,
          keep_empty = TRUE) %>% 
   select(-lang.code, -lang.name) %>% 
@@ -120,7 +121,8 @@ gov_list_unnest_1 <- uk_gov_list_filtered %>%
 
 
 # B) Unlist recipient countries
-gov_list_unnest_2 <- uk_gov_list_filtered %>% 
+gov_list_unnest_2 <- uk_gov_list_filtered %>%
+  filter(lengths(recipient_country) != 0) %>%
   unnest(cols = recipient_country,
          keep_empty = TRUE) %>% 
   select(iati_identifier, percentage, country.code, country.name) %>% 
@@ -133,7 +135,8 @@ gov_list_unnest_2 <- uk_gov_list_filtered %>%
 
 
 # C) Unlist sectors
-gov_list_unnest_3 <- uk_gov_list_filtered %>% 
+gov_list_unnest_3 <- uk_gov_list_filtered %>%
+  filter(lengths(sector) != 0) %>%
   unnest(cols = sector,
          keep_empty = TRUE) %>% 
   select(iati_identifier, sector.code, sector.name, percentage) %>% 
@@ -158,6 +161,7 @@ gov_list_unnest_3 <- uk_gov_list_filtered %>%
 
 # D) Unlist implementing organisations
 gov_list_unnest_4 <- uk_gov_list_filtered %>% 
+  filter(lengths(participating_org) != 0) %>%
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative, ref) %>% 
@@ -197,6 +201,7 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
 
 # E) Unlist extending organisations
 gov_list_unnest_5 <- uk_gov_list_filtered %>% 
+  filter(lengths(participating_org) != 0) %>%
   unnest(cols = participating_org,
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative) %>% 
@@ -211,6 +216,7 @@ gov_list_unnest_5 <- uk_gov_list_filtered %>%
 
 # F) Unlist reporting department
 gov_list_unnest_6 <- uk_gov_list_filtered %>% 
+  filter(lengths(reporting_org.narrative) != 0) %>%
   unnest(cols = reporting_org.narrative,
          keep_empty = TRUE) %>% 
   select(iati_identifier, reporting_org_ref = reporting_org.ref, 
@@ -221,6 +227,7 @@ gov_list_unnest_6 <- uk_gov_list_filtered %>%
 
 # G) Unlist and aggregate committments
 gov_list_unnest_7 <- uk_gov_list_filtered %>% 
+  filter(lengths(budget) != 0) %>%
   unnest(cols = budget,
          keep_empty = TRUE) %>% 
   #  filter(value.date >= "2015-04-01" & value.date <= "2020-03-31") %>%   # restrict time window for spend
@@ -261,6 +268,7 @@ gov_list_unnest_7 <- uk_gov_list_filtered %>%
 
 # H) Unlist start/end dates
 gov_list_unnest_8 <- uk_gov_list_filtered %>% 
+  filter(lengths(activity_date) != 0) %>%
   unnest(cols = activity_date,
          keep_empty = TRUE) %>% 
   select(iati_identifier, 

@@ -108,9 +108,6 @@ for (id in ukri_projects_ids_full$`GtR ID`) {
 saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 # ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
 
-# Save org names and countries to file
-saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
-# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
 
 
 ### E - Add on fund and funder labels
@@ -183,6 +180,11 @@ ukri_projects_final <- ukri_projects_final %>%
 # Save as R file (to read back in if needed)
 saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
 # ukri_projects_final <- readRDS("Outputs/ukri_projects_final.rds") 
+
+# Save org names and countries to file
+saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
+# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
+
 
 rm(data)
 rm(n)

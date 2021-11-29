@@ -222,7 +222,6 @@ activity_list_unnest_2 <- partner_activity_comb %>%
       }
       
       # Unnest information -----
-      
       transactions_unnest <- transaction_list %>% 
         filter(lengths(recipient_countries) != 0) %>% 
         unnest(cols = recipient_countries,
