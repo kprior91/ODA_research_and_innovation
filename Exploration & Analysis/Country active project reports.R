@@ -16,6 +16,8 @@ country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Phili
 
 # Read in datasets and abbrieviate funder names
 
+nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
+
 all_projects <- readRDS("Outputs/all_projects.rds") %>% 
   mutate(Funder = case_when(
     Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
@@ -78,7 +80,8 @@ for(i in 1:length(country_list)) {
              `Beneficiary Country` = recipient_country,
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
              `Value (£)` = amount,
-             `Web Link` = link) %>% 
+             `Web Link` = link,
+             currency) %>% 
       group_by(Title, Funder) %>% 
       slice(1) %>% 
       ungroup() %>% 
@@ -100,7 +103,7 @@ for(i in 1:length(country_list)) {
       # Keep one row per project title
       slice(1) %>% 
       select(Funder, Fund, Programme, Title, Start, End, Description, `Beneficiary Country`,
-             `Lead Organisation`, `Partner Organisations`, `Value (£)`, `Web Link`)
+             `Lead Organisation`, `Partner Organisations`, `Value (£)`, `Web Link`, currency)
   
     # Format numerical value column
     class(output_report$`Value (£)`) <- "comma"

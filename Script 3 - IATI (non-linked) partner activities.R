@@ -17,7 +17,7 @@ iati_activity_ids <- iati_activity_ids %>%
 # Prepare results data frame and counters
 partner_activity_extract <- data.frame()
 
-# id <- "GB-COH-877338-GV-GOV-1-300708-124"
+# IDS example not working: id <- "GB-COH-877338-GV-GOV-1-300708-124" 
 
 # Run extraction, stopping when no new sector codes returned
 for (id in iati_activity_ids$iati_id) {

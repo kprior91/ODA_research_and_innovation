@@ -269,6 +269,11 @@ org_names_and_locations_3 <- nihr_projects_final %>%
                  organisation_country = lead_org_country) %>% 
           mutate(organisation_role = 1)
 
+# Save as R file (to read back in if needed)
+saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final.rds")
+# nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
+
+
 rm(nihr_projects)
 rm(request)
 rm(response)
@@ -373,7 +378,8 @@ wellcome_grants_formatted <- wellcome_grants %>%
                           "Department of Health and Social Care", `CoFunders`),
          Fund = if_else(Funder == "Department of Health and Social Care",
                         "Global Health Research - Partnerships", "FCDO Research - Programmes"),
-         last_updated = quarter_end_date) 
+         last_updated = quarter_end_date) %>% 
+  filter(`ODA Funding` > 0)
 
 # Select desired variables
 wellcome_grants_formatted <- wellcome_grants_formatted %>% 

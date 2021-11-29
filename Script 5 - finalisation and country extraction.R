@@ -139,7 +139,8 @@ all_projects_tidied <- all_projects_tidied %>%
 
 # Join funder programme name to main dataset
 all_projects_tidied <- all_projects_tidied %>%
-      left_join(gov_funder_programme_names, by = c("iati_id" = "funder_iati_id")) 
+      left_join(gov_funder_programme_names, by = c("iati_id" = "funder_iati_id")) %>% 
+      mutate(funder_programme = if_else(extending_org == "Wellcome Trust", subject, funder_programme))
 
 
 # 4) Apply manual exclusions/rule ----------------------------
