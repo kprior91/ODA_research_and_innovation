@@ -17,6 +17,8 @@ iati_activity_ids <- iati_activity_ids %>%
 # Prepare results data frame and counters
 partner_activity_extract <- data.frame()
 
+# id <- "GB-COH-877338-GV-GOV-1-300708-124"
+
 # Run extraction, stopping when no new sector codes returned
 for (id in iati_activity_ids$iati_id) {
 
@@ -269,7 +271,7 @@ activity_list_unnest_4 <- partner_activity_comb %>%
          keep_empty = TRUE) %>% 
   select(iati_identifier, role.name, narrative, ref) %>% 
   filter(lengths(narrative) != 0,
-         role.name != "Funding") %>% 
+         role.name == "Implementing") %>% 
   unnest(cols = narrative,
          keep_empty = TRUE) %>% 
   filter(lang.name == "English") %>% 
@@ -278,7 +280,6 @@ activity_list_unnest_4 <- partner_activity_comb %>%
 
   # Add country locations based on IATI references or lookup
     activity_list_unnest_4 <- activity_list_unnest_4 %>%
-      filter(role.name == "Implementing") %>% 
       mutate(
         org_country_iati = case_when(        
           str_detect(ref, "GB-") ~ "United Kingdom", 
