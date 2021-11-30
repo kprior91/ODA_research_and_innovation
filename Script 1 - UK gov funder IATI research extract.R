@@ -1,4 +1,5 @@
 # --------------------------------------------------------------- #
+# Script 1
 # Extract ODA research activities from UK gov funder IATI data #
 # --------------------------------------------------------------- #
 
@@ -330,7 +331,7 @@ gov_list <- gov_list %>%
   mutate(reporting_org = str_replace_all(reporting_org, "UK - ", ""))
 
 
-# 4) Account for parent-child hierarchies -----------
+# 5) Account for parent-child hierarchies -----------
 # Extract detail at child activity level (if available) and ensure
 # spend is not being double-counted e.g. for DFID
 
@@ -355,19 +356,9 @@ gov_list_final <- gov_list_final %>%
   mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
                                         programme_description,
                                         General))
-
-
-# --------------
-
-# check list of ODA R&I funds
-unique(gov_list_final$fund)
-
-# check list of ODA R&I funders
-unique(gov_list_final$reporting_org)
-
-#---------------
   
-# Save to Rdata file
+
+# 6) Save to Rdata file ----
 saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 # gov_list_final <- readRDS("Outputs/gov_list_final.rds") 
 

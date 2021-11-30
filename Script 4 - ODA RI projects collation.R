@@ -1,4 +1,4 @@
-#####################################
+# --------------------------------------------------------------- #
 # Script 4 
 # Extract and collate ODA R&I award level data from
 # - UKRI Gateway to Research
@@ -7,9 +7,9 @@
 # - Wellcome Trust (spreadsheet)
 # - FCDO partners (spreadsheets)
 # - BEIS (RODA)
-#####################################
+# --------------------------------------------------------------- #
 
-# Read in org names and countries dataset
+# Read in org names and countries from previous script
 org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.rds")
 
 # 1) Extract UKRI projects -------------------------------------------
@@ -453,7 +453,7 @@ rm(wellcome_grants_formatted)
 path = "Inputs//IATI returns"
 file_list <- list.files(path = path, pattern='*.xlsx', full.names = TRUE)
 
-# Read all files into R (skipping first 28 lines in Excel sheet as this contains no data)
+# Read all files into R
 data_list <- lapply(file_list, 
                     read_excel, 
                     sheet = 2)
@@ -614,21 +614,49 @@ rm(roda_extract_newton)
 
 # 7) Join funder datasets together ----------------------------------------------
 
-all_projects <- rbind(ukri_projects_with_countries, nihr_projects_final, 
-                      iati_projects_final, wellcome_grants_final,
+all_projects <- rbind(ukri_projects_with_countries, 
+                      nihr_projects_final, 
+                      iati_projects_final, 
+                      wellcome_grants_final,
                       collated_spreadsheet_data,
                       roda_extract_gcrf_final, roda_extract_newton_final) %>% 
-                unique() %>% 
-                ungroup()
+  unique() %>% 
+  ungroup()
+
+
+# 8) Manual exclusions and formatting -------------------------------------------
+
+# Manually edit country info for Chevening Scholarships
+all_projects_tidied <- all_projects %>% 
+  mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
+         start_date = if_else(Fund == "Chevening Scholarships", "", start_date))
+
+# Remove non-research partners
+# (linked partner data from non-RED managed programmes)
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(extending_org %in% c("Sightsavers",
+                                "Coffey International Development Limited, a Tetra Tech Company")))
+
+# Correct missing IDS name (ARPA activity)
+all_projects_tidied <- all_projects_tidied %>% 
+  mutate(extending_org = if_else(extending_org == "GB-COH-877338", 
+                                 "Institute of Development Studies", extending_org))
+
+# Remove WHO non-research/innovation activities
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(extending_org == "World Health Organization") |
+           str_detect(title, "research|innovation"))
 
 # Add FCDO DevTracker links in absence of other public source
-all_projects <- all_projects %>% 
+all_projects_tidied <- all_projects_tidied %>% 
   mutate(link = if_else((str_detect(iati_id, "GB-GOV-1-") | str_detect(iati_id, "GB-1-")) & is.na(link),
                         paste0("https://devtracker.fcdo.gov.uk/projects/", iati_id, "/summary"), link))
 
-# Save as R file (to read back in if needed)
-saveRDS(all_projects, file = "Outputs/all_projects.rds")
-# all_projects <- readRDS("Outputs/all_projects.rds") 
+
+# 9) Save datasets -------------------------------------------
+
+saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied.rds")
+# all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
 # Save org names and countries to file
 org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locations_2, org_names_and_locations_3) %>% 
@@ -638,13 +666,6 @@ org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locati
 
 saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
 
-# 8) CHECKING ----
-test1 <- filter(all_projects, str_detect(extending_org, "Food"))
-test2 <- filter(all_projects, str_detect(id, "CA-CRA_ACR-811793611-HGC"))
-test3 <- filter(all_projects, str_detect(Funder, "Food"))
-
-# Example UKRI project funded by BEIS GCRF, FCDO and DHSC
-test4 <- filter(all_projects, str_detect(id, "MR/M009211/1"))
 
 
 

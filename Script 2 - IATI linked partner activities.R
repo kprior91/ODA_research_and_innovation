@@ -1,5 +1,5 @@
 # --------------------------------------------------------------- #
-# Script 1
+# Script 2
 # Extract IATI partner activities linked to RED programmes/components
 # by an incoming fund transaction activity ID
 # --------------------------------------------------------------- #
@@ -63,5 +63,4 @@ rm(transactions_dataset)
 
 # Save to Rdata file
 saveRDS(red_linked_activites, file = "Outputs/red_linked_activites.rds")
-# Restore the object
 # red_linked_activites <- readRDS(file = "Outputs/red_linked_activites.rds")

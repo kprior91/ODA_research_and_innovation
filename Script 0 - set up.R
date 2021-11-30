@@ -1,49 +1,52 @@
 
-### Set dates ----
+### Set end of quarter data for update ----
 
-# Set quarter end date
 quarter_end_date <- as.Date("2021-09-30")
 
 
-### Install packages ----
+### Check and install packages ----
 
-if (!("jsonlite" %in% installed.packages())) {
+packages <- data.frame(installed.packages())
+
+if (!("jsonlite" %in% packages$Package)) {
   install.packages("jsonlite")
 }
-if (!("httr" %in% installed.packages())) {
+if (!("httr" %in% packages$Package)) {
   install.packages("httr")
 }
-if (!("tidyverse" %in% installed.packages())) {
+if (!("tidyverse" %in% packages$Package)) {
   install.packages("tidyverse")
 }
-if (!("dplyr" %in% installed.packages())) {
+if (!("dplyr" %in% packages$Package)) {
   install.packages("dplyr")
 }
-if (!("readxl" %in% installed.packages())) {
+if (!("readxl" %in% packages$Package)) {
   install.packages("readxl")
 }
-if (!("writexl" %in% installed.packages())) {
+if (!("writexl" %in% packages$Package)) {
   install.packages("writexl")
 }
-if (!("googlesheets4" %in% installed.packages())) {
+if (!("googlesheets4" %in% packages$Package)) {
   install.packages("googlesheets4")
 }
-if (!("gargle" %in% installed.packages())) {
+if (!("gargle" %in% packages$Package)) {
   install.packages("gargle")
 }
-if (!("openxlsx" %in% installed.packages())) {
+if (!("openxlsx" %in% packages$Package)) {
   install.packages("openxlsx")
 } # for adding hyperlinks and formatting to output Excel reports
-if (!("DBI" %in% installed.packages())) {
+if (!("DBI" %in% packages$Package)) {
   install.packages("DBI")
 } # for read/writing to Excel database
-if (!("odbc" %in% installed.packages())) {
+if (!("odbc" %in% packages$Package)) {
   install.packages("odbc")
 } 
-if (!("countrycode" %in% installed.packages())) {
+if (!("countrycode" %in% packages$Package)) {
   install.packages("countrycode")
 } 
-
+if (!("testthat" %in% packages$Package)) {
+  install.packages("testthat")
+} 
 
 library(jsonlite)
 library(httr)
@@ -57,6 +60,7 @@ library(openxlsx)
 library(DBI)
 library(odbc)
 library(countrycode)
+library(testthat)
 
 ### Read in reference data ----
 
@@ -80,7 +84,8 @@ countries_string <- paste0(str_to_lower(countries), collapse = "|")
 
 
 # 2) DAC country lookup and Tableau accepted country list
-dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xlsx")
+dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xlsx") %>% 
+  mutate(country_name = str_to_lower(country_name))
 
 
 ### Input data ----
@@ -124,10 +129,6 @@ org_country_lookup <- function(org_name) {
   
   return(result)
 }
-
-# Test
-# org_name <- "International Development Research Centre"
-# org_country_lookup(org_name)
 
 
 ### IATI ###
@@ -173,9 +174,6 @@ iati_activity_extract <- function(activity_id) {
 
 
 # Function to extract IATI activity IDs for a specified org code
-# Error with this CGIAR page
-# org_code <- "XM-DAC-47015"
-# page <- 77
 
 org_activity_extract <- function(page, org_code, org_activity_list) {
   path <- paste0("https://iati.cloud/api/activities/?format=json&reporting_org_identifier=", org_code, "&fields=iati_identifier,other_identifier,activity_date,reporting_org,sector,location,default_flow_type,budget,policy_marker,activity_status,hierarchy,title,description,participating_org,related_activity,tag&page_size=20&page=", page)
@@ -262,7 +260,6 @@ extract_ukri_projects_by_fund <- function(page, fund) {
 
 
 # 2 - Function to extract staff organisation
-# person_id <- "6E394347-A44B-4868-8EC3-06CA4D034BDA"
 
 extract_staff_org <- function(staff_data, person_id) {
   
@@ -283,7 +280,6 @@ extract_staff_org <- function(staff_data, person_id) {
 
 # 3 - Function to extract country from organisation ID
 # (checking GRID database as well as UKRI)
-# org_id <- "C3F01E23-4A38-46BD-B3CE-8983CE6DBF36"
 
 extract_org_country <- function(org_id) {
   
@@ -316,7 +312,6 @@ extract_org_country <- function(org_id) {
 
 
 # 4 - Master function to extract UKRI project data by ID
-# id <- "AH/T007362/1"
 
 extract_ukri_projects_by_id <- function(id) {
   
@@ -448,4 +443,4 @@ extract_ukri_projects_by_id <- function(id) {
   return(list(project_data, org_table))
 }
 
-# test <- extract_ukri_projects_by_id(id)
+

@@ -1,4 +1,7 @@
-# Script to output Excel sheet of active projects in a country #
+# --------------------------------------------------------------- #
+# Script 7
+# Output Excel sheet of active projects by country #
+# --------------------------------------------------------------- #
 
 ### 1) Set up ---
 
@@ -9,23 +12,19 @@
 #                   "Madagascar", "Malawi", "Mauritius", "Mozambique", "Réunion", "Rwanda", 
 #                   "Seychelles", "Somalia", "Somaliland", "Tanzania", "Uganda", "Zambia", "Zimbabwe")
 
-## Indo-Pacific
 country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Philippines",
                   "Singapore", "Thailand", "Vietnam")
 
+# Define strings for use in output file name
+string <- "ASEAN"
+data <- "Nov21"
 
-# Read in datasets and abbrieviate funder names
-
+# Read in datasets
 nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
+tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
 
-all_projects <- readRDS("Outputs/all_projects.rds") %>% 
-  mutate(Funder = case_when(
-    Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
-    Funder == "Department of Health and Social Care" ~ "DHSC",
-    Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-  ))
-
-all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") %>% 
+# Abbrieviate/format organisation names
+tableau_projects_tidied <- tableau_projects_tidied %>% 
   mutate(Funder = case_when(
     Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
     Funder == "Department of Health and Social Care" ~ "DHSC",
@@ -41,10 +40,7 @@ all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") %>%
       extending_org == "UKSA" ~ "UK Space Agency"
     )) 
 
-
-### 2) Output reports for each country ----
-
-wb <- openxlsx::createWorkbook()
+# Define Excel styling
 
 # Set header style (bold)
 header_st <- createStyle(textDecoration = "Bold",
@@ -56,6 +52,11 @@ table_st <- createStyle(fontSize = 8, fontName = "Arial",
                         wrapText = TRUE,
                         valign = "top")
 
+
+### 2) Output reports for each country ----
+
+wb <- openxlsx::createWorkbook()
+
 for(i in 1:length(country_list)) {
 
     print(paste0(i, " - ", country_list[i]))
@@ -66,7 +67,7 @@ for(i in 1:length(country_list)) {
              status == "Active")
   
     # Extract project data for selected country
-    country_project_ids <- all_projects_tidied %>% 
+    country_project_ids <- tableau_projects_tidied %>% 
       filter(Country == country_list[i] |
              id %in% nihr_country_projects$id) %>% 
       mutate(Start = as.numeric(as.character(format(as.Date(start_date), format = "%Y"))),
@@ -129,10 +130,6 @@ for(i in 1:length(country_list)) {
     
 }
 
-# Resave Excel file
-saveWorkbook(wb, "Outputs//Indo-Pacific ODA programmes - Nov21.xlsx", overwrite = TRUE)
-
-
-
-
+# Save Excel file
+saveWorkbook(wb, paste0("Outputs//", string, "active ODA projects - ", date, ".xlsx"), overwrite = TRUE)
 
