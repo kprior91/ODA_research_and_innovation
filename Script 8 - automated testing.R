@@ -72,6 +72,31 @@ test_that("fund names are as expected", {
 ### MASTER DATASET ----
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
+# Check no duplicates when organisations have names in multiple languages in the
+# IATI registry
+
+test_that("IDRC has no duplicate projects and its English name in dataset only", {
+  
+  idrc_example <- all_projects_tidied %>% 
+    filter(str_detect(id, "XM-DAC-301-2")) %>% 
+    select(extending_org) %>% 
+    unique()
+  
+  expect_equal(idrc_example$extending_org, "International Development Research Centre")
+  
+})
+
+test_that("UN Refugee Agency", {
+  
+  un_ref_example <- all_projects_tidied %>% 
+    filter(str_detect(id, "XM-DAC-41121-2017-GLOBALPROG")) %>% 
+    select(extending_org) %>% 
+    unique()
+  
+  expect_equal(un_ref_example$extending_org, "The UN Refugee Agency")
+  
+})
+
 
 # Check funder names
 

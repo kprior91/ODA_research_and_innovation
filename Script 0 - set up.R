@@ -88,6 +88,7 @@ dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xl
   mutate(country_name = str_to_lower(country_name))
 
 
+
 ### Input data ----
 
 # FCDO partner IATI activities (to add manually as not linked) 
@@ -132,6 +133,28 @@ org_country_lookup <- function(org_name) {
 
 
 ### IATI ###
+
+# Function to match IATI country code to name 
+country_code_to_name <- function(country_code) {
+  
+  # check if input is a valid 2-digit country code
+  if(is.na(country_code) | nchar(country_code) < 2) { country_name <- NA }
+  
+  else {
+      path <- paste0("https://iati.cloud/api/countries/?code=", country_code, "&format=json")
+      request <- GET(url = path)
+      response <- content(request, as = "text", encoding = "UTF-8")
+      response <- (fromJSON(response, flatten = TRUE))$results 
+      
+      # Check whether a name has been found
+      if(length(response) > 0) {
+        country_name <- response$name
+      } else {
+        country_name <- NA
+      }
+  }
+  return(country_name)
+}
 
 # Function to extract 5-digit OECD sector codes
 

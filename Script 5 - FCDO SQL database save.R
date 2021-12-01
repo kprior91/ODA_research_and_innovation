@@ -25,8 +25,8 @@ org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 
 # View data extracts from current tables
 
-recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]")
-project_first_10 <- dbFetch(recordSet, n = -1)
+# recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]")
+# project_first_10 <- dbFetch(recordSet, n = -1)
 
 recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Funder]")
 funder_first_10 <- dbFetch(recordSet, n = -1)
@@ -39,7 +39,7 @@ country_first_10 <- dbFetch(recordSet, n = -1)
 
 
 # 1) Create master project table ----
-project_table <- all_projects %>% 
+project_table <- all_projects_tidied %>% 
   # remove all fields that can have multiple entries for a project
   select(-Funder, -Fund, -iati_id,
          -recipient_country, 
@@ -47,11 +47,14 @@ project_table <- all_projects %>%
          -partner_org_name, -partner_org_country,
          -period_start, -period_end,
          -last_updated) %>% 
+  # limit character fields to 255 chars
+  mutate(title = if_else(nchar(title) > 255, substr(title, 1, 255), title),
+         abstract = if_else(nchar(abstract) > 5000, substr(abstract, 1, 5000), abstract),
+         abstract = str_replace_all(abstract, "$", "USD"),
+         subject = if_else(nchar(subject) > 255, substr(subject, 1, 255), subject),
+         link = if_else(nchar(link) > 255, "", link)) %>%
   rename(project_id = id) %>% 
   unique()
-
-# check uniqueness
-test <- unique(project_table$id)
 
 # find duplicate project ids
 duplicates <- project_table %>% 
@@ -64,9 +67,10 @@ duplicates <- project_table %>%
 project_table <- project_table[!duplicated(project_table$project_id), ] 
 
 
+
 # 2) Create funder table ----
 
-funder_table <- all_projects %>% 
+funder_table <- all_projects_tidied %>% 
   # remove all fields that can have multiple entries for a project
   select(project_id = id, funder = Funder, 
          fund = Fund, funder_iati_id = iati_id) %>% 
@@ -143,10 +147,37 @@ dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Funder]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Organisation]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Country]")
 
-dbAppendTable(con_live, "Project", project_table, row.names = NULL)
+dbAppendTable(con_live, "Project", head(project_table, 3250), row.names = NULL)
+
+
 dbAppendTable(con_live, "Funder", funder_table, row.names = NULL)
 dbAppendTable(con_live, "Organisation", organisation_table, row.names = NULL)
 dbAppendTable(con_live, "Country", country_table_final, row.names = NULL)
 
 # Disconnect from database
 dbDisconnect(con_live)
+
+
+### ERROR - PROJECT TABLE
+
+# issue between record 3200 and 3300
+# Error in result_insert_dataframe(rs@ptr, values, batch_rows) : 
+#   nanodbc/nanodbc.cpp:1655: 22001: [Microsoft][ODBC SQL Server Driver]String data, right truncation 
+
+project_table_extract <- project_table %>% 
+  slice(3200:3300) %>% 
+  mutate(len_title = nchar(title),
+         len_id = nchar(project_id),
+         len_abstract = nchar(abstract),
+         len_extending_org = nchar(extending_org),
+         len_subject = nchar(subject),
+         len_link = nchar(link))
+
+max(project_table_extract$len_id, na.rm = TRUE)
+max(project_table_extract$len_abstract, na.rm = TRUE)
+max(project_table_extract$len_subject, na.rm = TRUE)
+max(project_table_extract$len_title, na.rm = TRUE)
+max(project_table_extract$len_link, na.rm = TRUE)
+max(project_table_extract$len_extending_org, na.rm = TRUE)
+
+

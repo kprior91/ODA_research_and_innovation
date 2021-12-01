@@ -1,7 +1,7 @@
 
 # Script to pull off lists of most common organisations by country
 
-country <- c("Vietnam")
+country <- c("Indonesia")
 
 country_orgs <- org_names_and_locations %>% 
   filter(organisation_country %in% country,

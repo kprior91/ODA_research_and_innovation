@@ -279,17 +279,11 @@ activity_list_unnest_4 <- partner_activity_comb %>%
 
   # Add country locations based on IATI references or lookup
     activity_list_unnest_4 <- activity_list_unnest_4 %>%
-      mutate(
-        org_country_iati = case_when(        
-          str_detect(ref, "GB-") ~ "United Kingdom", 
-          str_detect(ref, "US-") ~ "United States", 
-          str_detect(ref, "NL-") ~ "Netherlands",
-          str_detect(ref, "CA-") ~ "Canada",
-          str_detect(ref, "IN-") ~ "India",
-          str_detect(ref, "KE-") ~ "Kenya",
-          str_detect(ref, "ZA-") ~ "South Africa"),
-        org_country_other = map(text, org_country_lookup)) %>% 
-      mutate(org_country_other = unlist(org_country_other)) %>% 
+      mutate(country_code = if_else(!is.na(ref) & substr(ref,3,3) == "-", substr(ref,1,2), ""),
+             org_country_iati = map(country_code, country_code_to_name),
+             org_country_other = map(text, org_country_lookup)) %>% 
+      mutate(org_country_iati = unlist(org_country_iati),
+             org_country_other = unlist(org_country_other)) %>% 
       mutate(org_country = coalesce(org_country_iati, org_country_other)) %>% 
       select(-org_country_iati, -org_country_other)
       
@@ -331,25 +325,21 @@ activity_list_unnest_5 <- partner_activity_comb %>%
   select(iati_identifier, reporting_org_ref = reporting_org.ref, 
          reporting_org_type = reporting_org.type.name,
          reporting_org = text) %>% 
-  # Account for IDRC having names in 3 languages
-  filter(reporting_org_ref != "XM-DAC-301-2" | reporting_org == "International Development Research Centre") %>% 
+  # take top (English) name in cases of different languages
+  group_by(iati_identifier, reporting_org_ref, reporting_org_type) %>%
+  slice(1) %>% 
   unique()
 
     # Lookup country
     activity_list_unnest_5 <- activity_list_unnest_5 %>% 
-        mutate(
-          org_country_iati = case_when(        
-            str_detect(reporting_org_ref, "GB-") ~ "United Kingdom", 
-            str_detect(reporting_org_ref, "US-") ~ "United States", 
-            str_detect(reporting_org_ref, "NL-") ~ "Netherlands",
-            str_detect(reporting_org_ref, "CA-") ~ "Canada",
-            str_detect(reporting_org_ref, "IN-") ~ "India",
-            str_detect(reporting_org_ref, "KE-") ~ "Kenya",
-            str_detect(reporting_org_ref, "ZA-") ~ "South Africa"),
-          org_country_other = map(reporting_org, org_country_lookup)) %>% 
-          mutate(org_country_other = unlist(org_country_other)) %>% 
-          mutate(reporting_org_country = coalesce(org_country_iati, org_country_other)) %>% 
-          select(-org_country_iati, -org_country_other)
+      mutate(country_code = if_else(!is.na(reporting_org_ref) & substr(reporting_org_ref,3,3) == "-", 
+                                    substr(reporting_org_ref,1,2), ""),
+             org_country_iati = map(country_code, country_code_to_name),
+             org_country_other = map(reporting_org, org_country_lookup)) %>% 
+      mutate(org_country_iati = unlist(org_country_iati),
+             org_country_other = unlist(org_country_other)) %>% 
+      mutate(reporting_org_country = coalesce(org_country_iati, org_country_other)) %>% 
+      select(-org_country_iati, -org_country_other)
 
     # Add on to org file to save
     org_names_and_locations_1 <- activity_list_unnest_5 %>% 
@@ -462,10 +452,3 @@ saveRDS(activity_list, file = "Outputs/partner_activity_list.rds")
 # Save org names and countries to file
 saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1.rds")
 
-# Check funds, funders
-table(activity_list$fund)
-table(activity_list$gov_funder)
-table(activity_list$currency)
-
-# Check specific partner
-test1 <- filter(activity_list, str_detect(reporting_org, "World Health Organization"))
