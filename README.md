@@ -18,12 +18,16 @@ The following scripts are designed to run sequentially.
 
 **Script 3 - IATI (non-linked) partner activities.R** - extracts other IATI activities published by external partners, either manually identified and listed in the Inputs spreadsheet *IATI partner activities.xlsx* or identified from specific research partners like CGIAR, CABI and Bill & Melinda Gates Foundation as being funded by UK ODA
 
-**Script 4 - ODA RI awards collation.R** - master script that extracts ODA award data from public repositories (UKRI Gateway to Research, 
+**Script 4 - ODA RI projects collation.R** - master script that extracts ODA award data from public repositories (UKRI Gateway to Research, 
 NIHR Open Data), reads in other funder data (Wellcome, IATI data from previous scripts, BEIS RODA extracts), formats for consistency and collates.
 
-**Script 5 - finalisation and country extraction.R** - separates and cleans the country field for feeding into a Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
+**Script 5 - FCDO SQL database save.R** - separates project data into 4 relational SQL tables to save to a database on FCDO's AMP server (access by request, available to FCDO internal staff)
 
-**Script 6 - FCDO SQL database save.R** - separates project data into 4 relational SQL tables to save to a database on FCDO's AMP server (access by request, available to FCDO internal staff)
+**Script 6 - Output 1 (active projects for Tableau).R** - separates and cleans the country field for feeding into a Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
+
+**Script 7 - Output 2 (country active project lists).R** - outputs a formatted Excel list of active projects for specified countries
+
+**Script 8 - automated testing.R** - automated tests of scripts and outputs for quality assurance
 
 
 ### Inputs
@@ -36,18 +40,17 @@ NIHR Open Data), reads in other funder data (Wellcome, IATI data from previous s
 * *Wellcome grants.xlsx:* ODA grant data provided quarterly by the Wellcome Trust, identified via the UK government partner
 * *UKRI non GCRF-Newton projects.xlsx:* UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). These have been provided directly by UKRI.
 
+
 ## Data visualisations
 
-Output from the two scripts above feed two visualisations of ODA funded research & innovation:
+Output 1 from the scripts saves a formatted data extract to a Google Sheet to feed a Tableau Public map visualisations of ODA funded research & innovation:
 
-* Dashboard 1: (Power BI)
-https://app.powerbi.com/view?r=eyJrIjoiOTg1ODdlYjctNjEwOC00MWJmLWFiOGQtZjQ1NjU0MzhmNjI3IiwidCI6IjNiN2E2NzVhLTFmYzgtNDk4My1hMTAwLWNjNTJiNzY0NzczNyIsImMiOjh9
-
-* Dashboard 2: Funded ODA R&I awards by country: 
+* Tableau map - Funded ODA R&I projects by country: 
 https://public.tableau.com/views/ODARIprojectsv3/MainPage?:language=en-US&:display_count=n&:origin=viz_share_link
+
 
 ## Exploration and Analysis
 
-Various scripts using the collated project data for analyses - e.g. *"Country active project reports.R"* outputs a formatted Excel list of active projects by country 
+Various scripts using the collated project data for analyses
 
 

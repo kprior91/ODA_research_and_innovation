@@ -1,6 +1,4 @@
 .Rproj.user/*
-.RData
-.RhistoryAMP c
+.RData/*
+.Rhistory/*
 Archive/
-
-.Rproj.user
