@@ -88,7 +88,8 @@ tableau_projects_tidied <- tableau_projects_tidied %>%
 # TEMPORARY ***
 # Remove IDRC DHSC IATI data (this has been provided by spreadsheet)
 tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"))
+  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"),
+         !is.na(amount))
 
 # TEMPORARY
 # Remove Afghanistan projects (added Sep 21)

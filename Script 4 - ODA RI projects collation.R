@@ -556,7 +556,7 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
   ) %>% 
   unnest(cols = lead_org_country) %>% 
     # suppress display of active project end dates that have passed
-  mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, "")) %>%
+  mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, NA_character_)) %>%
     # remove unecessary variables
   select(-Level, -`Recipient region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
          -`Actual end date`, -Status)
@@ -589,7 +589,7 @@ roda_extract_newton_final <- roda_extract_newton %>%
          last_updated = quarter_end_date) %>% 
   unnest(cols = lead_org_country) %>%
   # suppress display of end dates that have passed
-  mutate(end_date = if_else(Sys.Date() <= end_date, end_date, "")) %>%
+  mutate(end_date = if_else(Sys.Date() <= end_date, end_date, NA_character_)) %>%
   
   select(-Level, -`Recipient region`, -`Planned start date`, -Status,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)

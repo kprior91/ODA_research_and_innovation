@@ -25,8 +25,8 @@ org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 
 # View data extracts from current tables
 
-# recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]")
-# project_first_10 <- dbFetch(recordSet, n = -1)
+recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]") 
+project_first_10 <- dbFetch(recordSet, n = -1)
 
 recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Funder]")
 funder_first_10 <- dbFetch(recordSet, n = -1)
@@ -50,9 +50,12 @@ project_table <- all_projects_tidied %>%
   # limit character fields to 255 chars
   mutate(title = if_else(nchar(title) > 255, substr(title, 1, 255), title),
          abstract = if_else(nchar(abstract) > 5000, substr(abstract, 1, 5000), abstract),
-         abstract = str_replace_all(abstract, "$", "USD"),
          subject = if_else(nchar(subject) > 255, substr(subject, 1, 255), subject),
          link = if_else(nchar(link) > 255, "", link)) %>%
+  # remove special characters
+  mutate(title = str_replace_all(title, "‘|’", ""),
+         abstract = str_replace_all(abstract, "‘|’", "")) %>%
+  mutate(end_date = if_else(end_date == "", NA_character_, end_date)) %>% 
   rename(project_id = id) %>% 
   unique()
 
@@ -93,46 +96,46 @@ country_table <- all_projects_tidied %>%
 
 # Convert location vs. beneficiary country data to long format
 country_table <- country_table %>% 
-  gather(key = "country_type", value = "country", -project_id) %>% 
+  gather(key = "country_type", value = "Country", -project_id) %>% 
   mutate(country_type = if_else(country_type == "beneficiary_country", 1, 2),
-         country = str_to_lower(country))
+         Country = str_to_lower(Country))
 
 # Clean country names
 country_table_cleaned <- country_table %>%
-  mutate(country = str_replace_all(country, "\\(the\\)", ""),  # remove (the)
-         country = gsub("[()]", "", country),                  # remove all parentheses
-         country = str_replace_all(country, "tanzania, united republic of", "tanzania"),
-         country = str_replace_all(country, "congo the democratic republic of the|drc|democratic republic of congo", 
+  mutate(Country = str_replace_all(Country, "\\(the\\)", ""),  # remove (the)
+         Country = gsub("[()]", "", Country),                  # remove all parentheses
+         Country = str_replace_all(Country, "tanzania, united republic of", "tanzania"),
+         Country = str_replace_all(Country, "congo the democratic republic of the|drc|democratic republic of congo", 
                                    "democratic republic of the congo"),
-         country = str_replace_all(country, "china people's republic of", "china"),
-         country = str_replace_all(country, "democratic people's republic of korea", "democratic people’s republic of korea")) %>% 
+         Country = str_replace_all(Country, "china people's republic of", "china"),
+         Country = str_replace_all(Country, "democratic people's republic of korea", "democratic people’s republic of korea")) %>% 
   # standardise separators
-  mutate(country = gsub("\\s*\\([^\\)]+\\)","", country))
+  mutate(Country = gsub("\\s*\\([^\\)]+\\)","", Country))
 
 # Convert dataset to long with one row per country entry
 country_table_cleaned <- country_table_cleaned %>% 
-  separate_rows(country, sep = ",|;", convert = FALSE) %>% 
-  mutate(country = str_trim(country)) %>% 
+  separate_rows(Country, sep = ",|;", convert = FALSE) %>% 
+  mutate(Country = str_trim(Country)) %>% 
   unique() %>% 
-  filter(country != "")
+  filter(Country != "")
 
 # Further country cleaning
 country_table_cleaned <- country_table_cleaned %>% 
-  mutate(country = str_trim(country)) %>%
-  mutate(country = case_when(
-    str_detect(country, "uk|scotland|wales|united kingdom|england|ireland") ~ "united kingdom",
-    str_detect(country, "usa|united states") ~ "united states",
-    country == "us" ~ "united states",
-    str_detect(country, "ivoire") ~ "ivory coast",
-    str_detect(country, "viet") ~ "vietnam",
-    str_detect(country, "lao") ~ "laos",
-    TRUE ~ country)) %>% 
+  mutate(Country = str_trim(Country)) %>%
+  mutate(Country = case_when(
+    str_detect(Country, "uk|scotland|wales|united kingdom|england|ireland") ~ "united kingdom",
+    str_detect(Country, "usa|united states") ~ "united states",
+    Country == "us" ~ "united states",
+    str_detect(Country, "ivoire") ~ "ivory coast",
+    str_detect(Country, "viet") ~ "vietnam",
+    str_detect(Country, "lao") ~ "laos",
+    TRUE ~ Country)) %>% 
   unique() 
 
 # Replace country with "unknown" if not recognised against Tableau's accepted list
 country_table_final <- country_table_cleaned %>%
-  mutate(country = if_else(country %in% dac_lookup$country_name, country, "unknown")) %>% 
-  mutate(country = tools::toTitleCase(country)) %>% 
+  mutate(Country = if_else(Country %in% dac_lookup$country_name, Country, "unknown")) %>% 
+  mutate(Country = tools::toTitleCase(Country)) %>% 
   unique()
 
 # Save datasets for testing
@@ -147,9 +150,7 @@ dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Funder]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Organisation]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Country]")
 
-dbAppendTable(con_live, "Project", head(project_table, 3250), row.names = NULL)
-
-
+dbAppendTable(con_live, "Project", head(project_table, 6000), row.names = NULL)
 dbAppendTable(con_live, "Funder", funder_table, row.names = NULL)
 dbAppendTable(con_live, "Organisation", organisation_table, row.names = NULL)
 dbAppendTable(con_live, "Country", country_table_final, row.names = NULL)
@@ -160,18 +161,11 @@ dbDisconnect(con_live)
 
 ### ERROR - PROJECT TABLE
 
-# issue between record 3200 and 3300
-# Error in result_insert_dataframe(rs@ptr, values, batch_rows) : 
-#   nanodbc/nanodbc.cpp:1655: 22001: [Microsoft][ODBC SQL Server Driver]String data, right truncation 
-
 project_table_extract <- project_table %>% 
-  slice(3200:3300) %>% 
-  mutate(len_title = nchar(title),
-         len_id = nchar(project_id),
-         len_abstract = nchar(abstract),
-         len_extending_org = nchar(extending_org),
-         len_subject = nchar(subject),
-         len_link = nchar(link))
+  slice(5500:6000) 
+
+dbAppendTable(con_live, "Project", project_table_extract, row.names = NULL)
+  
 
 max(project_table_extract$len_id, na.rm = TRUE)
 max(project_table_extract$len_abstract, na.rm = TRUE)
