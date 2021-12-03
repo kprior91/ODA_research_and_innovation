@@ -55,7 +55,6 @@ project_table <- all_projects_tidied %>%
   # remove special characters
   mutate(title = str_replace_all(title, "‘|’", ""),
          abstract = str_replace_all(abstract, "‘|’", "")) %>%
-  mutate(end_date = if_else(end_date == "", NA_character_, end_date)) %>% 
   rename(project_id = id) %>% 
   unique()
 
@@ -150,7 +149,7 @@ dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Funder]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Organisation]")
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Country]")
 
-dbAppendTable(con_live, "Project", head(project_table, 6000), row.names = NULL)
+dbAppendTable(con_live, "Project", slice(project_table, 5000:6000), row.names = NULL)
 dbAppendTable(con_live, "Funder", funder_table, row.names = NULL)
 dbAppendTable(con_live, "Organisation", organisation_table, row.names = NULL)
 dbAppendTable(con_live, "Country", country_table_final, row.names = NULL)

@@ -62,7 +62,7 @@ ukri_projects_by_fund_with_id <- ukri_projects_by_fund %>%
 
 # Format data to join to other GtR ODA projects
 ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>% 
-  mutate(`Funder IATI ID` = "", Funder = "Department for Business, Energy and Industrial Strategy") %>% 
+  mutate(`Funder IATI ID` = NA_character_, Funder = "Department for Business, Energy and Industrial Strategy") %>% 
   select(`Funder IATI ID`, Fund, Funder, `Extending Org` = leadFunder, `GtR ID`)
 
 
@@ -132,11 +132,11 @@ ukri_projects_final <- ukri_projects_final %>%
          end_date = fund.end,
          id = gtr_id,
   ) %>% 
-  mutate(recipient_country = "",
-         subject = "",
+  mutate(recipient_country = NA_character_,
+         subject = NA_character_,
          amount = as.numeric(amount),
-         period_start = "",
-         period_end = "",
+         period_start = NA_character_,
+         period_end = NA_character_,
          currency = "GBP",
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
                         if_else(Fund == "Newton", "Newton Fund", Fund)),
@@ -226,18 +226,18 @@ nihr_projects_final <- nihr_projects %>%
   mutate(id = project_id,
          Funder = "Department of Health and Social Care",
          Fund = "Global Health Research - Programmes",
-         recipient_country = "",
+         recipient_country = NA_character_,
          lead_org_country = ctrynm,
-         iati_id = "",
+         iati_id = NA_character_,
          subject = programme,
          currency = "GBP",
          status = if_else(project_status %in% c("Active", "Contracted"), "Active",
                           if_else(project_status %in% c("Complete"), "Closed", 
                                   if_else(project_status %in% c("Discontinued"), "Cancelled", "Unknown"))),
-         period_start = "",
-         period_end = "",
-         partner_org_name = "",
-         partner_org_country = "",
+         period_start = NA_character_,
+         period_end = NA_character_,
+         partner_org_name = NA_character_,
+         partner_org_country = NA_character_,
          extending_org = "NIHR",
          last_updated = as.Date(record_timestamp)) %>% 
   select(id, 
@@ -372,10 +372,10 @@ wellcome_grants_formatted <- wellcome_grants %>%
          currency = "GBP",
          partner_org_name = `Other Implementing Organisations`,
          partner_org_country = `Research Location Countries`,
-         recipient_country = "",
-         period_start = "",
-         period_end = "",
-         iati_id = "",
+         recipient_country = NA_character_,
+         period_start = NA_character_,
+         period_end = NA_character_,
+         iati_id = NA_character_,
          Funder = if_else(str_detect(`CoFunders`, "National Institute for Health Research"), 
                           "Department of Health and Social Care", `CoFunders`),
          Fund = if_else(Funder == "Department of Health and Social Care",
@@ -481,9 +481,9 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
   mutate(start_date = as.character(start_date),
          end_date = as.character(end_date),
          currency = coalesce(Currency, "GBP"),
-         period_start = "",
-         period_end = "",
-         subject = "",
+         period_start = NA_character_,
+         period_end = NA_character_,
+         subject = NA_character_,
          status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
          last_updated = quarter_end_date
          ) %>% 
@@ -541,18 +541,18 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          lead_org_country = map(lead_org_name, org_country_lookup),
-         partner_org_name = "",
-         partner_org_country = "",
-         iati_id = "",
+         partner_org_name = NA_character_,
+         partner_org_country = NA_character_,
+         iati_id = NA_character_,
          currency = "GBP",
          status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
                           if_else(Status %in% c("Completed"), "Closed", 
                                   if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
-         period_start = "",
-         period_end = "",
-         subject = "",
+         period_start = NA_character_,
+         period_end = NA_character_,
+         subject = NA_character_,
          last_updated = quarter_end_date,
-         link = ""
+         link = NA_character_
   ) %>% 
   unnest(cols = lead_org_country) %>% 
     # suppress display of active project end dates that have passed
@@ -574,18 +574,18 @@ roda_extract_newton_final <- roda_extract_newton %>%
   mutate(Fund = "Newton Fund",
          Funder = "Department for Business, Energy and Industrial Strategy",
          lead_org_country = map(lead_org_name, org_country_lookup),
-         partner_org_country = "",
-         iati_id = "",
-         link = "",
+         partner_org_country = NA_character_,
+         iati_id = NA_character_,
+         link = NA_character_,
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          currency = "GBP",
          status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
                           if_else(Status %in% c("Completed"), "Closed", 
                                   if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
-         period_start = "",
-         period_end = "",
-         subject = "",
+         period_start = NA_character_,
+         period_end = NA_character_,
+         subject = NA_character_,
          last_updated = quarter_end_date) %>% 
   unnest(cols = lead_org_country) %>%
   # suppress display of end dates that have passed
@@ -629,7 +629,7 @@ all_projects <- rbind(ukri_projects_with_countries,
 # Manually edit country info for Chevening Scholarships
 all_projects_tidied <- all_projects %>% 
   mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
-         start_date = if_else(Fund == "Chevening Scholarships", "", start_date))
+         start_date = if_else(Fund == "Chevening Scholarships", NA_character_, start_date))
 
 # Remove non-research partners
 # (linked partner data from non-RED managed programmes)
@@ -665,8 +665,4 @@ org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locati
   unique()
 
 saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
-
-
-
-
 

@@ -16,11 +16,15 @@ tableau_projects <- all_projects_tidied %>%
 tableau_projects$row_id <- seq.int(nrow(tableau_projects))
 
 
+test <- filter(all_projects_tidied, str_detect(id, "300211-6"))
+test2 <- filter(country_table_final, str_detect(project_id, "300211-6"))
+test3 <- filter(tableau_projects_tidied, str_detect(id, "300211-6"))
+
 # 2) Remove unnecessary country "unknown" records) --------
 
 # Extract project records with unknown or missing country field
 unknown_country_projects <- filter(tableau_projects, 
-                                   country %in% c("Unknown") | is.na(country)) %>% 
+                                   Country %in% c("Unknown") | is.na(Country)) %>% 
   select(row_id, id) %>% 
   unique() %>% 
   mutate(exclude = 1)
@@ -28,7 +32,7 @@ unknown_country_projects <- filter(tableau_projects,
 # Identify projects that have both a populated and missing country field 
 # Restrict to just the populated fields (to keep)
 duplicate_country_projects <- filter(tableau_projects, 
-                                     !(country %in% c("Unknown") | is.na(country))) %>% 
+                                     !(Country %in% c("Unknown") | is.na(Country))) %>% 
   select(row_id, id) %>% 
   unique() %>% 
   filter(id %in% unknown_country_projects$id) %>% 
@@ -42,7 +46,8 @@ tableau_projects_tidied <- tableau_projects %>%
          exclude == 1 & !(id %in% duplicate_country_projects$id) |
          is.na(keep) & is.na(exclude)) %>% 
   select(-keep, -exclude) %>% 
-  mutate(country = coalesce(country, "Unknown"))
+  mutate(Country = coalesce(Country, "Unknown"),
+         country_type = coalesce(country_type, 1))
 
 rm(tableau_projects)
 rm(unknown_country_projects)
@@ -88,13 +93,19 @@ tableau_projects_tidied <- tableau_projects_tidied %>%
 # TEMPORARY ***
 # Remove IDRC DHSC IATI data (this has been provided by spreadsheet)
 tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(!(Funder == "Department of Health and Social Care" & extending_org == "International Development Research Centre"),
-         !is.na(amount))
+  filter(!(Funder == "Department of Health and Social Care" & 
+           extending_org == "International Development Research Centre" &
+           is.na(amount))
+         )
+
+test <- tableau_projects_tidied %>% 
+  filter(extending_org == "International Development Research Centre")
+ # filter(!(country_type %in% c(1,2)))
 
 # TEMPORARY
 # Remove Afghanistan projects (added Sep 21)
 tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(country != "Afghanistan")
+  filter(Country != "Afghanistan")
 
 
 # 5) Write data --------------------------------
