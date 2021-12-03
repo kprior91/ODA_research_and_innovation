@@ -88,8 +88,8 @@ organisation_table <- org_names_and_locations
 
 # Distinguish location and beneficiary countries in main dataset
 country_table <- all_projects_tidied %>%
-  mutate(beneficiary_country = recipient_country,
-         location_country = paste0(coalesce(lead_org_country, ""), ", ", coalesce(partner_org_country, ""))) %>% 
+  mutate(beneficiary_country = coalesce(recipient_country, "Unknown"),
+         location_country = paste0(coalesce(lead_org_country, "Unknown"), ", ", coalesce(partner_org_country, "Unknown"))) %>%
   select(project_id = id, location_country, beneficiary_country) %>% 
   unique()
 
@@ -115,8 +115,7 @@ country_table_cleaned <- country_table %>%
 country_table_cleaned <- country_table_cleaned %>% 
   separate_rows(Country, sep = ",|;", convert = FALSE) %>% 
   mutate(Country = str_trim(Country)) %>% 
-  unique() %>% 
-  filter(Country != "")
+  unique()
 
 # Further country cleaning
 country_table_cleaned <- country_table_cleaned %>% 

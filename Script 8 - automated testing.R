@@ -386,18 +386,18 @@ test_that("only projects with no country information whatsoever are labelled unk
   
   print("example 1: genuine unknown - Defra")
   test1 <- filter(tableau_projects_tidied, str_detect(id, "GB-GOV-7-ICF-P0011-RD"))
-  expect_equal(test1$country, "Unknown")
-  expect_equal(nrow(test1), 1)
+  expect_equal(unique(test1$Country), "Unknown")
+  expect_equal(nrow(test1), 2)
   
   print("example 2: known beneficiary, no known location")
-  test2 <- filter(tableau_projects_tidied, id == "GCRF-RAECHEPSSA-1819-3-HEPSSA2\\71")
-  expect_equal(test2$country_type, 1)
-  expect_equal(nrow(test2), 1)
+  test2 <- filter(tableau_projects_tidied, id == "GCRF-RAECHEPSSA-1819-3-HEPSSA2\\71") %>% arrange(country_type)
+  expect_equal(test2$Country, c("Nigeria", "Unknown"))
+  expect_equal(nrow(test2), 2)
   
   print("example 3: known location, no known beneficiary")
-  test3 <- filter(tableau_projects_tidied, id == "101918")
-  expect_equal(test3$country_type, 2)
-  expect_equal(nrow(test3), 1)
+  test3 <- filter(tableau_projects_tidied, id == "101918") %>% arrange(country_type)
+  expect_equal(test3$Country, c("Unknown", "United Kingdom"))
+  expect_equal(nrow(test3), 2)
   
   print("example 4: known beneficiary and known location") 
   test4 <- filter(tableau_projects_tidied, id == "ES/P010245/1")

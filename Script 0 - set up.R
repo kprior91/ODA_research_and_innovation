@@ -437,8 +437,8 @@ extract_ukri_projects_by_id <- function(id) {
                partner_org_country = org_roles_summarised$partner_country)
     } else {
       project_data <- project_data %>% 
-        mutate(partner_org_name = "",
-               partner_org_country = "")
+        mutate(partner_org_name = NA_character_,
+               partner_org_country = NA_character_)
     }
     
     # Write lead org name and country to file
