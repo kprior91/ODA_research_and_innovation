@@ -12,41 +12,31 @@ country_table_final <- readRDS("Outputs/country_table_final.rds")
 tableau_projects <- all_projects_tidied %>% 
   left_join(country_table_final, by = c("id" = "project_id"))
   
-# Add row ID field to dataset
-tableau_projects$row_id <- seq.int(nrow(tableau_projects))
-
 # 2) Remove unnecessary country "unknown" records --------
 
 # Extract project records with unknown or missing country field
-unknown_country_projects <- filter(tableau_projects,
-                                   Country %in% c("Unknown") | is.na(Country)) %>%
-  select(id, row_id) %>%
+unknown_country_projects <- filter(tableau_projects, Country == "Unknown") %>%
+  select(id) %>%
   unique() %>%
   mutate(exclude = 1)
 
 # Identify projects that have both a populated and missing country field
 # Restrict to just the populated fields (to keep)
-duplicate_country_projects <- filter(tableau_projects,
-                                     !(Country %in% c("Unknown") | is.na(Country))) %>%
-  select(id, row_id) %>%
+duplicate_country_projects <- filter(tableau_projects, Country == "Unknown") %>%
+  select(id) %>%
   unique() %>%
   filter(id %in% unknown_country_projects$id) %>%
   mutate(keep = 1)
 
 # Identify project with no country info whatsoever
 tableau_projects_tidied <- tableau_projects %>%
-  left_join(unknown_country_projects, by = c("id", "row_id")) %>%
-  left_join(duplicate_country_projects, by = c("id", "row_id")) %>%
+  left_join(unknown_country_projects, by = "id") %>%
+  left_join(duplicate_country_projects, by = "id") %>%
   filter(keep == 1 |
          exclude == 1 & !(id %in% duplicate_country_projects$id) |
          is.na(keep) & is.na(exclude)) %>% 
   select(-keep, -exclude) %>% 
-  mutate(country_type = coalesce(country_type, 3),
-         Country = coalesce(Country, "Unknown"))
-
-# Dedup
-tableau_projects_tidied <- tableau_projects_tidied %>% 
-  select(-row_id) %>% unique()
+  mutate(Country = coalesce(Country, "Unknown"))
 
 rm(tableau_projects)
 rm(unknown_country_projects)

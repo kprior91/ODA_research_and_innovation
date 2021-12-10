@@ -66,7 +66,7 @@ uk_gov_ri_programmes <- uk_gov_list_final %>%
 # Save list of tagged research & innovation programmes
 ri_iati_activities <- uk_gov_ri_programmes %>% 
   filter(code == "RI") %>% 
-  select(iati_identifier) %>% 
+  select(iati_identifier, reporting_org.ref) %>% 
   unique()
 
 saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
@@ -77,10 +77,10 @@ saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
 
 uk_gov_list_filtered <- uk_gov_ri_programmes %>% 
   filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52", "GB-GOV-10") | 
-           str_detect(iati_identifier, "GB-GOV-3") |  # Other UK gov deps (including ex-FCO)
-           code == "RI" |   # tagged FCDO RED programmes
-           str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Keep BEIS Newton/GCRF and DHSC GHS/GHR
-         default_flow_type == "ODA")                                            # ODA only
+          str_detect(iati_identifier, "GB-GOV-3") |  # Other UK gov deps (including ex-FCO)
+          code == "RI" |   # tagged FCDO RED programmes
+          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Keep BEIS Newton/GCRF and DHSC GHS/GHR
+          default_flow_type == "ODA")                                            # ODA only
 
 
 # 4) Unnest activity information -----------
@@ -309,7 +309,7 @@ gov_list <- gov_list %>%
 # Add Fund label
 gov_list <- gov_list %>%  
   mutate(fund = case_when(
-    (str_detect(iati_identifier, "Newton") | str_detect(iati_identifier, "NEWT") | str_detect(iati_identifier, "NT")) ~ "Newton Fund",
+    str_detect(iati_identifier, "Newton|NEWT|NF") ~ "Newton Fund",
     str_detect(iati_identifier, "GCRF") ~ "Global Challenges Research Fund (GCRF)",
     str_detect(iati_identifier, "UKVN") ~ "Global Health Security - UK Vaccine Network",
     str_detect(iati_identifier, "GAMRIF") ~ "Global Health Security - GAMRIF",
@@ -361,9 +361,5 @@ gov_list_final <- gov_list_final %>%
 # 6) Save to Rdata file ----
 saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 # gov_list_final <- readRDS("Outputs/gov_list_final.rds") 
-
-# Save to Excel (for Power BI dashboard)
-write_xlsx(x = list(`IATI research` = gov_list_final), 
-           path = "Outputs/IATI research activities.xlsx")
 
 

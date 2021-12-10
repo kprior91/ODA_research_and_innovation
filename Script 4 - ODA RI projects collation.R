@@ -1,9 +1,9 @@
 # --------------------------------------------------------------- #
 # Script 4 
 # Extract and collate ODA R&I award level data from
+# - IATI Registry 
 # - UKRI Gateway to Research
 # - NIHR Open Data
-# - IATI Registry 
 # - Wellcome Trust (spreadsheet)
 # - FCDO partners (spreadsheets)
 # - BEIS (RODA)
@@ -12,78 +12,116 @@
 # Read in org names and countries from previous script
 org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.rds")
 
-# 1) Extract UKRI projects -------------------------------------------
+# 1) Extract IATI projects ------------------------------------------------
 
-### A - Extract GCRF/Newton project IDs ###
+# Read in list of IATI activities (from UK gov funders and select delivery partners)
+iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds") %>% 
+  rename(recipient_country = all_countries)
+partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
-# Create empty dataset to hold projects
-ukri_projects_by_fund <- data.frame()
+# Filter gov department records for project-level activities
+iati_projects <- iati_activity_list %>%
+  filter(str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
+         str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
+         str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
+             #   str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
+             #   str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
+             #   str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
+             #   str_detect(iati_identifier, "NEWT-BC") |  # British Council
+             #   str_detect(iati_identifier, "GCRF-Clm") |  # Academies
+             #   str_detect(iati_identifier, "RS-GCRF|NEWT-RS") |  # Royal Society
+             #   str_detect(iati_identifier, "RAENG-GCRF|NEWT-RAE") |  # Royal Academy of Engineering
+        str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
+  ) %>%    
+  filter(flow_type == "ODA") %>% 
+  mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
+  plyr::rbind.fill(partner_iati_list) # Add partner activities
 
-for (fund in c("GCRF", "Newton")) {
-  
-  for (page in c(1:15)) {
-    
-    projects <- extract_ukri_projects_by_fund(page, fund)
-    
-    # Check if data exists, label country column and append to master
-    # project list if so
-    if(!is.null(nrow(projects))) {
-      
-      projects <- projects %>% 
-        mutate(Fund = fund,
-               Funder = "Department for Business, Energy and Industrial Strategy")
-      
-      if("participantValues" %in% names(projects)) {
-        projects <- projects %>% 
-          select(-participantValues)
-      }
-      
-      if(!("participantValues.participant" %in% names(projects))) {
-        projects <- projects %>% 
-          mutate(participantValues.participant = "")
-      }   
-      
-      ukri_projects_by_fund <- ukri_projects_by_fund %>% 
-        rbind(projects)
-      
-    } 
-    
-  }
-}
+# Identify UKRI projects (by "RI" IATI tag)
+ukri_iati_projects <- iati_activity_list %>% 
+  filter(extending_org == "UK Research & Innovation") %>% 
+  mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>% 
+  mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>% 
+  mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
+  select(gtr_id, iati_identifier, recipient_country) %>% 
+  unique()
 
-saveRDS(ukri_projects_by_fund, file = "Outputs/ukri_projects_by_fund.rds")
-# ukri_projects_by_fund <- readRDS("Outputs/ukri_projects_by_fund.rds") 
+# Keep required fields
+iati_projects_final <- iati_projects %>% 
+  mutate(Funder = coalesce(gov_funder, reporting_org),
+         partner_org_name = partner,
+         partner_org_country = partner_country,         
+         lead_org_name = coalesce(extending_org, reporting_org),
+         lead_org_country = reporting_org_country,
+         extending_org = coalesce(extending_org, reporting_org),
+         status = if_else(!is.na(end_date),
+                          if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),
+         last_updated = quarter_end_date) %>% 
+  select(id = iati_identifier,
+         title = activity_title, 
+         abstract = activity_description,
+         start_date,
+         end_date,
+         amount,
+         period_start,
+         period_end,
+         currency,
+         extending_org,
+         lead_org_name,
+         lead_org_country,
+         partner_org_name,
+         partner_org_country,
+         iati_id = programme_id,
+         Fund = fund,
+         Funder, 
+         recipient_country,
+         subject = sector_name,
+         status,
+         last_updated
+  ) 
 
-# Extract GTR ID from extract
-ukri_projects_by_fund_with_id <- ukri_projects_by_fund %>% 
-  unnest(cols = identifiers.identifier) %>% 
-  rename(`GtR ID` = value) %>% 
-  select(-type)
+# Add IATI link to awards
+iati_projects_final <- iati_projects_final %>% 
+  mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
 
-# Format data to join to other GtR ODA projects
-ukri_gcrf_newton_ids <- ukri_projects_by_fund_with_id %>% 
-  mutate(`Funder IATI ID` = NA_character_, Funder = "Department for Business, Energy and Industrial Strategy") %>% 
-  select(`Funder IATI ID`, Fund, Funder, `Extending Org` = leadFunder, `GtR ID`)
+# Clean up
+rm(iati_activity_list)
+rm(partner_iati_list)
+rm(iati_projects)
 
 
-### B - Combine GCRF/Newton project IDs with "other ODA" ones ###
+# 2) Extract UKRI projects -------------------------------------------
 
-# Join GCRF/Newton project IDs to other ODA IDs 
-ukri_projects_ids_full <- ukri_projects_ids %>% 
-  rbind(ukri_gcrf_newton_ids)
+### A - Prepare project IDs and fund labels ###
+
+# Label GCRF and Newton projects from IATI UKRI data
+ukri_projects_by_fund <- ukri_iati_projects %>% 
+  mutate(Fund = case_when(
+                   str_detect(iati_identifier, "GCRF") ~ "Global Challenges Research Fund (GCRF)",
+                   str_detect(iati_identifier, "Newton") ~ "Newton Fund",
+                   TRUE ~ "Other"
+                        ),
+         Funder = "Department for Business, Energy and Industrial Strategy")
+
+# Join GCRF/Newton project IDs to other ODA IDs (from spreadsheet) 
+ukri_projects_ids_full <- ukri_projects_by_fund %>% 
+  rbind(ukri_ooda_projects_ids)
 
 
-### C - Extract project info from GtR API ###
+### B - Extract project info from GtR API ###
 
 # Create empty dataset to hold projects
 ukri_projects_by_id <- data.frame()
 org_names_and_locations_2 <- data.frame()
 
+ids <- c("NE/V009354/1", "NE/V009362/1", "NE/V009427/1", "NE/V009516/1", "NE/V009591/1", "NE/V009621/1")
+
 # Run project info extraction over all GtR projects
 
 n <- 1 # set counter
 
-for (id in ukri_projects_ids_full$`GtR ID`) {
+for (id in ids) {
+#for (id in ukri_projects_ids_full$gtr_id) {
   
   print(paste0(n, " - ", id))
 
@@ -109,17 +147,16 @@ saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 # ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
 
 
-
-### E - Add on fund and funder labels
+### C - Add on fund and funder labels
 
 # Join to fund and funder info from original list
 ukri_projects_by_id_with_id <- ukri_projects_by_id %>% 
   left_join(select(ukri_projects_ids_full, 
-                   iati_id = `Funder IATI ID`, Fund, Funder,`GtR ID`), by = c("gtr_id" = "GtR ID")) 
+                   iati_id = iati_identifier, Fund, Funder, gtr_id), by = "gtr_id") 
 
 # See which awards from input list have not been found
-missing_awards <- select(ukri_projects_ids_full, `GtR ID`) %>% 
-  left_join(select(ukri_projects_by_id_with_id, gtr_id, title), by = c("GtR ID" = "gtr_id")) %>% 
+missing_awards <- select(ukri_projects_ids_full, gtr_id) %>% 
+  left_join(select(ukri_projects_by_id_with_id, gtr_id, title), by = "gtr_id") %>% 
   filter(is.na(title)) %>% 
   unique()
 
@@ -132,8 +169,7 @@ ukri_projects_final <- ukri_projects_final %>%
          end_date = fund.end,
          id = gtr_id,
   ) %>% 
-  mutate(recipient_country = NA_character_,
-         subject = NA_character_,
+  mutate(subject = NA_character_,
          amount = as.numeric(amount),
          period_start = NA_character_,
          period_end = NA_character_,
@@ -158,7 +194,6 @@ ukri_projects_final <- ukri_projects_final %>%
          iati_id,
          Fund,
          Funder, 
-         recipient_country,
          subject,
          status,
          last_updated) %>% 
@@ -177,9 +212,14 @@ ukri_projects_final <- ukri_projects_final %>%
   slice(1) %>% 
   ungroup()
 
+# Add on beneficiary countries from IATI
+ukri_projects_with_countries <- ukri_projects_final %>% 
+  left_join(ukri_iati_projects, by = c("id" = "gtr_id")) %>% 
+  select(-iati_identifier)
+
 # Save as R file (to read back in if needed)
-saveRDS(ukri_projects_final, file = "Outputs/ukri_projects_final.rds")
-# ukri_projects_final <- readRDS("Outputs/ukri_projects_final.rds") 
+saveRDS(ukri_projects_with_countries, file = "Outputs/ukri_projects_with_countries.rds")
+# ukri_projects_with_countries <- readRDS("Outputs/ukri_projects_with_countries.rds") 
 
 # Save org names and countries to file
 saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
@@ -198,7 +238,7 @@ rm(ukri_projects_by_id_with_id)
 rm(ukri_projects_ids)
 
 
-# 2) Extract NIHR projects ------------------------------------------------
+# 3) Extract NIHR projects ------------------------------------------------
 
 # Define URL to extract ODA projects
 path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&facet=pconnm&refine.funder=NIHR+(ODA)")
@@ -266,10 +306,10 @@ nihr_projects_final <- nihr_projects_final %>%
 
 # Write org names and countries to file
 org_names_and_locations_3 <- nihr_projects_final %>% 
-          select(project_id = id,
-                 organisation_name = lead_org_name,
-                 organisation_country = lead_org_country) %>% 
-          mutate(organisation_role = 1)
+                    select(project_id = id,
+                           organisation_name = lead_org_name,
+                           organisation_country = lead_org_country) %>% 
+                    mutate(organisation_role = 1)
 
 # Save as R file (to read back in if needed)
 saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final.rds")
@@ -280,88 +320,6 @@ rm(nihr_projects)
 rm(request)
 rm(response)
 
-# 3) Extract IATI projects ------------------------------------------------
-
-# Read in list of IATI activities (from funders and select delivery partners)
-iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds") %>% 
-  rename(recipient_country = all_countries)
-partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
-
-# Filter gov department records for minimum granularity
-iati_projects <- iati_activity_list %>%
-  filter(  str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
-           str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
-           str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
-        #   str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
-        #   str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
-        #   str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
-        #   str_detect(iati_identifier, "NEWT-BC") |  # British Council
-        #   str_detect(iati_identifier, "GCRF-Clm") |  # Academies
-        #   str_detect(iati_identifier, "RS-GCRF|NEWT-RS") |  # Royal Society
-        #   str_detect(iati_identifier, "RAENG-GCRF|NEWT-RAE") |  # Royal Academy of Engineering
-           str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
-  ) %>%    
-  filter(flow_type == "ODA") %>% 
-  mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
-  plyr::rbind.fill(partner_iati_list) # Add partner activities
-
-  # Add UKRI beneficiary countries
-  ukri_iati_projects <- iati_activity_list %>% 
-    filter(extending_org == "UK Research & Innovation") %>% 
-    mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>% 
-    mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>% 
-    mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
-    select(gtr_id, iati_country = recipient_country) %>% 
-    filter(!is.na(iati_country)) %>% 
-    unique()
-    
-  ukri_projects_with_countries <- ukri_projects_final %>% 
-    left_join(ukri_iati_projects, by = c("id" = "gtr_id")) %>% 
-    mutate(recipient_country = coalesce(iati_country, recipient_country)) %>% 
-    select(-iati_country)
-
-# Keep required fields
-iati_projects_final <- iati_projects %>% 
-  mutate(Funder = coalesce(gov_funder, reporting_org),
-         partner_org_name = partner,
-         partner_org_country = partner_country,         
-         lead_org_name = coalesce(extending_org, reporting_org),
-         lead_org_country = reporting_org_country,
-         extending_org = coalesce(extending_org, reporting_org),
-         status = if_else(!is.na(end_date),
-                                 if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),
-         last_updated = quarter_end_date) %>% 
-  select(id = iati_identifier,
-         title = activity_title, 
-         abstract = activity_description,
-         start_date,
-         end_date,
-         amount,
-         period_start,
-         period_end,
-         currency,
-         extending_org,
-         lead_org_name,
-         lead_org_country,
-         partner_org_name,
-         partner_org_country,
-         iati_id = programme_id,
-         Fund = fund,
-         Funder, 
-         recipient_country,
-         subject = sector_name,
-         status,
-         last_updated
-  ) 
-
-# Add IATI link to awards
-iati_projects_final <- iati_projects_final %>% 
-  mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
-
-# Clean up
-rm(iati_activity_list)
-rm(partner_iati_list)
-rm(iati_projects)
 
 # 4) Extract Wellcome projects ------------------------------------------------
 
@@ -659,7 +617,8 @@ saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied.rds")
 # all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
 # Save org names and countries to file
-org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locations_2, org_names_and_locations_3) %>% 
+org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locations_2, 
+                                 org_names_and_locations_3) %>% 
   mutate(organisation_name = str_trim(organisation_name)) %>% 
   filter(!is.na(organisation_name)) %>% 
   unique()

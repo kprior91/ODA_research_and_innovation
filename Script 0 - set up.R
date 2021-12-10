@@ -95,7 +95,8 @@ dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xl
 iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
 
 # UKRI non GCRF/Newton project IDs
-ukri_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1)
+ukri_ooda_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1) %>% 
+  mutate(recipient_country = NA_character_)
 
 # Wellcome ODA grant data
 wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")

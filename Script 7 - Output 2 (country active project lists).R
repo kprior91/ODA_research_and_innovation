@@ -17,7 +17,7 @@ country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Phili
 
 # Define strings for use in output file name
 string <- "ASEAN"
-data <- "Nov21"
+date <- "Nov21"
 
 # Read in datasets
 nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
@@ -131,5 +131,5 @@ for(i in 1:length(country_list)) {
 }
 
 # Save Excel file
-saveWorkbook(wb, paste0("Outputs//", string, "active ODA projects - ", date, ".xlsx"), overwrite = TRUE)
+saveWorkbook(wb, paste0("Outputs//", string, " active ODA projects - ", date, ".xlsx"), overwrite = TRUE)
 

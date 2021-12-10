@@ -240,7 +240,9 @@ activity_list_unnest_2 <- partner_activity_comb %>%
       
       
   # Join on transactions country info to rest of dataset
-  activity_list_unnest_2_comp <- activity_list_unnest_2 %>% 
+  activity_list_unnest_2_comp <- partner_activity_comb %>% 
+    select(iati_identifier) %>% 
+    left_join(activity_list_unnest_2, by = "iati_identifier") %>% 
     left_join(transactions_unnest, by = "iati_identifier") %>% 
     mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
     select(-country_name)

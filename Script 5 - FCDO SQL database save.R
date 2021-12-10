@@ -136,7 +136,27 @@ country_table_final <- country_table_cleaned %>%
   mutate(Country = tools::toTitleCase(Country)) %>% 
   unique()
 
-# Save datasets for testing
+# Remove unecessary unknowns
+  country_table_final$row_id <- seq.int(nrow(country_table_final))
+
+  # identify records with more than one country for a country_type
+  identify_multiples <- country_table_final %>% 
+    group_by(project_id, country_type) %>% 
+    summarise(n = n()) %>% 
+    filter(n > 1)
+
+  # identify "unknown" records for projects in the dataset above
+  identify_unknowns_to_delete <- country_table_final %>% 
+    filter(Country == "Unknown") %>% 
+    left_join(identify_multiples, by = c("project_id", "country_type")) %>% 
+    filter(!is.na(n))
+  
+  # remove these "unknowns" from the country table
+  country_table_final <- country_table_final %>% 
+    filter(!(row_id %in% identify_unknowns_to_delete$row_id)) %>% 
+    select(-row_id)
+
+  # Save datasets for testing
 saveRDS(country_table, file = "Outputs/country_table.rds")
 saveRDS(country_table_cleaned, file = "Outputs/country_table_cleaned.rds")
 saveRDS(country_table_final, file = "Outputs/country_table_final.rds")
