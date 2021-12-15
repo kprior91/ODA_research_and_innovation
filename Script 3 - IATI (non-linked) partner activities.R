@@ -221,29 +221,42 @@ activity_list_unnest_2 <- partner_activity_comb %>%
         }
       }
       
-      # Unnest information -----
-      transactions_unnest <- transaction_list %>% 
+      # Unnest country information -----
+      transactions_country <- transaction_list %>% 
         filter(lengths(recipient_countries) != 0) %>% 
-        unnest(cols = recipient_countries,
-               keep_empty = TRUE) %>%
+        unnest(cols = recipient_countries) %>%
         select(-country.url, -recipient_regions) %>% 
         rename(recipient_country = country.name) %>% 
-  
-        # remove transactions without a country
-        filter(!is.na(recipient_country)) %>%      
-
-        # summarise countries 
-        select(iati_identifier, recipient_country) %>% 
-        unique() %>% 
+        filter(!is.na(recipient_country)) %>% 
         group_by(iati_identifier) %>% 
         summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
       
+      # Unnest description information -----  
+      transactions_description <- transaction_list %>% 
+        filter(iati_identifier %in% transactions_country$iati_identifier) %>% 
+        unnest(cols = description.narrative) %>% 
+        rename(transaction_description = text) %>%
+        filter(!is.na(transaction_description)) %>% 
+        group_by(iati_identifier) %>% 
+        summarise(descriptions = paste(transaction_description, collapse = "; "))
+      
+      # Unnest recipient org information -----  
+      transactions_orgs <- transaction_list %>% 
+        filter(iati_identifier %in% transactions_country$iati_identifier) %>% 
+        filter(lengths(receiver_organisation.narrative) != 0) %>% 
+        unnest(cols = receiver_organisation.narrative) %>% 
+        rename(receiver_org = text) %>%
+        select(iati_identifier, receiver_org) %>% 
+        unique() %>% 
+        group_by(iati_identifier) %>% 
+        summarise(receiver_orgs = paste(receiver_org, collapse = ", "))      
+
       
   # Join on transactions country info to rest of dataset
   activity_list_unnest_2_comp <- partner_activity_comb %>% 
     select(iati_identifier) %>% 
     left_join(activity_list_unnest_2, by = "iati_identifier") %>% 
-    left_join(transactions_unnest, by = "iati_identifier") %>% 
+    left_join(transactions_country, by = "iati_identifier") %>% 
     mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
     select(-country_name)
   

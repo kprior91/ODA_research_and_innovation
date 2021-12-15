@@ -114,14 +114,11 @@ ukri_projects_ids_full <- ukri_projects_by_fund %>%
 ukri_projects_by_id <- data.frame()
 org_names_and_locations_2 <- data.frame()
 
-ids <- c("NE/V009354/1", "NE/V009362/1", "NE/V009427/1", "NE/V009516/1", "NE/V009591/1", "NE/V009621/1")
-
 # Run project info extraction over all GtR projects
 
 n <- 1 # set counter
 
-for (id in ids) {
-#for (id in ukri_projects_ids_full$gtr_id) {
+for (id in ukri_projects_ids_full$gtr_id) {
   
   print(paste0(n, " - ", id))
 
