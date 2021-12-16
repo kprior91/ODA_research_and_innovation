@@ -586,6 +586,19 @@ all_projects_tidied <- all_projects %>%
   mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
          start_date = if_else(Fund == "Chevening Scholarships", NA_character_, start_date))
 
+# Name BEIS delivery partners fully
+all_projects_tidied <- all_projects_tidied %>% 
+  mutate(extending_org = case_when(
+              extending_org == "AMS" ~ "Academy of Medical Sciences", 
+              extending_org == "BA" ~ "British Academy",
+              extending_org %in% c("BC", "BRITISH COUNCIL") ~ "British Council",
+              extending_org == "MO" ~ "Met Office",
+              extending_org == "RAE" ~ "Royal Academy of Engineering",
+              extending_org == "RS" ~ "Royal Society",
+              extending_org == "UKSA" ~ "UK Space Agency",
+              TRUE ~ extending_org
+              ))
+
 # Remove non-research partners
 # (linked partner data from non-RED managed programmes)
 all_projects_tidied <- all_projects_tidied %>% 

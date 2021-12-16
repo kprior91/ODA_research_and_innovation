@@ -327,6 +327,11 @@ test_that("check common country formatting issues", {
   countries <- paste0(corrected_6$country, collapse = "|")
   expect_false(str_detect(countries, "\\(the\\)"))
 
+  
+  # print("check project that should identify as UK")
+  # id == "103710"
+
+
 })
 
 

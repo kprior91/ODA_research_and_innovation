@@ -14,29 +14,36 @@ tableau_projects <- all_projects_tidied %>%
   
 # 2) Remove unnecessary country "unknown" records --------
 
-# Extract project records with unknown or missing country field
-unknown_country_projects <- filter(tableau_projects, Country == "Unknown") %>%
-  select(id) %>%
+# Identify projects with no country info whatsoever
+project_country_unknowns <- filter(tableau_projects, Country == "Unknown") %>%
+  select(id, country_type) %>%
   unique() %>%
-  mutate(exclude = 1)
+  group_by(id) %>% 
+  summarise(n = n()) %>% 
+  filter(n > 1)
 
-# Identify projects that have both a populated and missing country field
-# Restrict to just the populated fields (to keep)
-duplicate_country_projects <- filter(tableau_projects, Country == "Unknown") %>%
-  select(id) %>%
-  unique() %>%
-  filter(id %in% unknown_country_projects$id) %>%
-  mutate(keep = 1)
-
-# Identify project with no country info whatsoever
-tableau_projects_tidied <- tableau_projects %>%
-  left_join(unknown_country_projects, by = "id") %>%
-  left_join(duplicate_country_projects, by = "id") %>%
-  filter(keep == 1 |
-         exclude == 1 & !(id %in% duplicate_country_projects$id) |
-         is.na(keep) & is.na(exclude)) %>% 
-  select(-keep, -exclude) %>% 
-  mutate(Country = coalesce(Country, "Unknown"))
+# Delete any other unknown records - these don't need displaying in Tableau
+tableau_projects <- tableau_projects %>% 
+  filter(id %in% project_country_unknowns$id | Country != "Unknown") 
+  
+# 
+# # Identify projects that have both a populated and missing country field
+# # Restrict to just the populated fields (to keep)
+# duplicate_country_projects <- filter(tableau_projects, Country == "Unknown") %>%
+#   select(id) %>%
+#   unique() %>%
+#   filter(id %in% unknown_country_projects$id) %>%
+#   mutate(keep = 1)
+# 
+# # Identify project with no country info whatsoever
+# tableau_projects_tidied <- tableau_projects %>%
+#   left_join(unknown_country_projects, by = "id") %>%
+#   left_join(duplicate_country_projects, by = "id") %>%
+#   filter(keep == 1 |
+#          exclude == 1 & !(id %in% duplicate_country_projects$id) |
+#          is.na(keep) & is.na(exclude)) %>% 
+#   select(-keep, -exclude) %>% 
+#   mutate(Country = coalesce(Country, "Unknown"))
 
 rm(tableau_projects)
 rm(unknown_country_projects)
@@ -45,7 +52,7 @@ rm(duplicate_country_projects)
 # 3) Add funder programme names ------------------
 
 # Add FCDO programme ID to dataset
-tableau_projects_tidied <- tableau_projects_tidied %>% 
+tableau_projects_tidied <- tableau_projects %>% 
     # remove any text before "-1-" in the FCDO IATI ID
   mutate(fcdo_programme_id = if_else((Funder == "Foreign, Commonwealth and Development Office"
                                      & str_detect(iati_id, "-1-")),
