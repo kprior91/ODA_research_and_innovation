@@ -45,7 +45,6 @@ tableau_projects <- tableau_projects %>%
 #   select(-keep, -exclude) %>% 
 #   mutate(Country = coalesce(Country, "Unknown"))
 
-rm(tableau_projects)
 rm(unknown_country_projects)
 rm(duplicate_country_projects)
 

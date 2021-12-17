@@ -12,12 +12,17 @@
 #                   "Madagascar", "Malawi", "Mauritius", "Mozambique", "Réunion", "Rwanda", 
 #                   "Seychelles", "Somalia", "Somaliland", "Tanzania", "Uganda", "Zambia", "Zimbabwe")
 
-country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Philippines",
-                  "Singapore", "Thailand", "Vietnam")
+## ASEAN countries
+# country_list <- c("Cambodia", "Indonesia", "Laos", "Malaysia", "Myanmar", "Philippines",
+#                   "Singapore", "Thailand", "Vietnam")
+
+## IIOD countries
+# country_list <- c("India", "Nepal", "Bangladesh", "Bhutan", "Sri Lanka", "Maldives")
+
 
 # Define strings for use in output file name
-string <- "ASEAN"
-date <- "Nov21"
+string <- "IIOD"
+date <- "Dec21"
 
 # Read in datasets
 nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
@@ -29,16 +34,7 @@ tableau_projects_tidied <- tableau_projects_tidied %>%
     Funder == "Foreign, Commonwealth and Development Office" ~ "FCDO",
     Funder == "Department of Health and Social Care" ~ "DHSC",
     Funder == "Department for Business, Energy and Industrial Strategy" ~ "BEIS"
-  ),
-    extending_org = case_when(
-      extending_org == "BC" ~ "British Council",
-      extending_org == "MO" ~ "Met Office",
-      extending_org == "AMS" ~ "Academy of Medical Sciences",
-      extending_org == "RS" ~ "Royal Society",
-      extending_org == "BA" ~ "British Academy",
-      extending_org == "RAE" ~ "Royal Academy of Engineering",
-      extending_org == "UKSA" ~ "UK Space Agency"
-    )) 
+  )) 
 
 # Define Excel styling
 
@@ -115,7 +111,7 @@ for(i in 1:length(country_list)) {
                         headerStyle = header_st,
                         borderStyle = "thin")
     # Add font style
-    addStyle(wb, sheet = i, table_st, rows = 2:200, cols = 1:12, gridExpand = TRUE, stack = TRUE)
+    addStyle(wb, sheet = i, table_st, rows = 2:500, cols = 1:12, gridExpand = TRUE, stack = TRUE)
     
     # Identify titles and hyperlinks
     hyperlinks <- output_report$`Web Link`

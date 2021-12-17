@@ -432,6 +432,14 @@ test_that("country_type field has 3 types", {
   
 })
 
+# Output final list of countries (to sense-check for duplicates)
+country_list_final <- tableau_projects_tidied %>% 
+  select(Country) %>% 
+  unique() %>% 
+  arrange(Country)
+
+View(country_list_final)
+
 
 # Check funder names
 
