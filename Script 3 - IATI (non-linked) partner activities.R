@@ -343,7 +343,8 @@ activity_list_unnest_5 <- partner_activity_comb %>%
   # take top (English) name in cases of different languages
   group_by(iati_identifier, reporting_org_ref, reporting_org_type) %>%
   slice(1) %>% 
-  unique()
+  unique() %>% 
+  ungroup()
 
     # Lookup country
     activity_list_unnest_5 <- activity_list_unnest_5 %>% 
@@ -357,13 +358,13 @@ activity_list_unnest_5 <- partner_activity_comb %>%
       select(-org_country_iati, -org_country_other)
 
     # Add on to org file to save
-    org_names_and_locations_1 <- activity_list_unnest_5 %>% 
-          select(project_id = iati_identifier,
-                 organisation_name = reporting_org,
-                 organisation_country = reporting_org_country) %>% 
-          mutate(organisation_role = 1) %>% # leading
-          rbind(org_names_and_locations_1) %>% 
-          unique()
+    org_names_and_locations_1 <- org_names_and_locations_1 %>% 
+      rbind(activity_list_unnest_5 %>% 
+                select(project_id = iati_identifier,
+                       organisation_name = reporting_org,
+                       organisation_country = reporting_org_country) %>% 
+                mutate(organisation_role = 1) %>% # leading
+                unique())
     
 # 6) Unlist and aggregate committments
 activity_list_unnest_6 <- partner_activity_comb %>% 

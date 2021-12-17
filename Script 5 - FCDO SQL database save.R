@@ -9,14 +9,9 @@ org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 
 
 # Connect to ODA RI Projects database on development server
+# (need to be connected to DFID VPN)
 
-# con_dev <- DBI::dbConnect(odbc::odbc(),
-#                       Driver = "SQL Server", 
-#                       Server   = "hed-sql-200",
-#                       Database = "ODARIProjects",
-#                       Trusted_Connection = "False")
-
-  con_live <- DBI::dbConnect(odbc::odbc(),
+con_live <- DBI::dbConnect(odbc::odbc(),
                             Driver = "SQL Server", 
                             Server   = "hel-sql-120",
                             Database = "ODARIProjects",
@@ -25,8 +20,9 @@ org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 
 # View data extracts from current tables
 
-recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]") 
-project_first_10 <- dbFetch(recordSet, n = -1)
+# causes error (?)
+# recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]") 
+# project_first_10 <- dbFetch(recordSet, n = -1)
 
 recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Funder]")
 funder_first_10 <- dbFetch(recordSet, n = -1)
@@ -53,8 +49,10 @@ project_table <- all_projects_tidied %>%
          subject = if_else(nchar(subject) > 255, substr(subject, 1, 255), subject),
          link = if_else(nchar(link) > 255, "", link)) %>%
   # remove special characters
-  mutate(title = str_replace_all(title, "‘|’", ""),
-         abstract = str_replace_all(abstract, "‘|’", "")) %>%
+  mutate(title = str_replace_all(title, "‘|’|´", ""),
+         title = str_replace_all(title, "´", "'"),
+         abstract = str_replace_all(abstract, "‘|’", ""),
+         abstract = str_replace_all(abstract, "´", "'")) %>%
   rename(project_id = id) %>% 
   unique()
 
@@ -163,35 +161,23 @@ saveRDS(country_table, file = "Outputs/country_table.rds")
 saveRDS(country_table_cleaned, file = "Outputs/country_table_cleaned.rds")
 saveRDS(country_table_final, file = "Outputs/country_table_final.rds")
 
+
 # 5) Delete and write data in database table ----
 
 dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Project]")
-dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Funder]")
-dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Organisation]")
-dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Country]")
+dbAppendTable(con_live, "Project", project_table, row.names = NULL)
 
-dbAppendTable(con_live, "Project", slice(project_table, 5000:6000), row.names = NULL)
+dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Funder]")
 dbAppendTable(con_live, "Funder", funder_table, row.names = NULL)
+
+dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Organisation]")
 dbAppendTable(con_live, "Organisation", organisation_table, row.names = NULL)
+
+dbSendQuery(con_live, "DELETE FROM [ODARIProjects].[dbo].[Country]")
 dbAppendTable(con_live, "Country", country_table_final, row.names = NULL)
 
-# Disconnect from database
+
+# Disconnect from SQL server 
 dbDisconnect(con_live)
-
-
-### ERROR - PROJECT TABLE
-
-project_table_extract <- project_table %>% 
-  slice(5500:6000) 
-
-dbAppendTable(con_live, "Project", project_table_extract, row.names = NULL)
-  
-
-max(project_table_extract$len_id, na.rm = TRUE)
-max(project_table_extract$len_abstract, na.rm = TRUE)
-max(project_table_extract$len_subject, na.rm = TRUE)
-max(project_table_extract$len_title, na.rm = TRUE)
-max(project_table_extract$len_link, na.rm = TRUE)
-max(project_table_extract$len_extending_org, na.rm = TRUE)
 
 

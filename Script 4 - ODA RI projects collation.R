@@ -563,6 +563,10 @@ org_names_and_locations_3 <- org_names_and_locations_3 %>%
                organisation_country = lead_org_country) %>% 
           mutate(organisation_role = 1))
 
+saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3.rds")
+# org_names_and_locations_3 <- readRDS("Outputs/org_names_and_locations_3.rds") 
+
+
 rm(roda_extract_gcrf)
 rm(roda_extract_newton)
 
