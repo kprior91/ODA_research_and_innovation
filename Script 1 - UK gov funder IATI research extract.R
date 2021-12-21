@@ -66,8 +66,9 @@ uk_gov_ri_programmes <- uk_gov_list_final %>%
 # Save list of tagged research & innovation programmes
 ri_iati_activities <- uk_gov_ri_programmes %>% 
   filter(code == "RI") %>% 
-  select(iati_identifier, reporting_org.ref) %>% 
-  unique()
+  select(iati_identifier) %>% 
+  unique() %>% 
+  mutate(tag = "RI")
 
 saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
 # ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities.rds")
@@ -75,10 +76,12 @@ saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
 
 # Filter out non-research programmes  
 
-uk_gov_list_filtered <- uk_gov_ri_programmes %>% 
+uk_gov_list_filtered <- uk_gov_list_final %>% 
+  select(-tag) %>% 
+  left_join(ri_iati_activities, by = "iati_identifier") %>% 
   filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52", "GB-GOV-10") | 
           str_detect(iati_identifier, "GB-GOV-3") |  # Other UK gov deps (including ex-FCO)
-          code == "RI" |   # tagged FCDO RED programmes
+          !is.na(tag) |   # tagged FCDO RED programmes
           str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Keep BEIS Newton/GCRF and DHSC GHS/GHR
           default_flow_type == "ODA")                                            # ODA only
 
@@ -317,6 +320,7 @@ gov_list <- gov_list %>%
     str_detect(iati_identifier, "ICF") ~ "International Climate Finance (ICF)",
     str_detect(iati_identifier, "Chevening") ~ "Chevening Scholarships",
     str_detect(iati_identifier, "GB-1-|GB-GOV-1-") ~ "FCDO Research - Programmes",
+    reporting_org_ref == "GB-GOV-10" ~ "Global Health Research - Partnerships",
     TRUE ~ "Other"
   ))
 

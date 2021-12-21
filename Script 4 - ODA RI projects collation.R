@@ -24,14 +24,7 @@ iati_projects <- iati_activity_list %>%
   filter(str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
          str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
          str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
-             #   str_detect(iati_identifier, "UKSA") |   # UKSA awards (GCRF)
-             #   str_detect(iati_identifier, "NEWT-MO") |   # Met Office awards (Newton)
-             #   str_detect(iati_identifier, "NEWT-BIS") |  # Other Met Office awards?
-             #   str_detect(iati_identifier, "NEWT-BC") |  # British Council
-             #   str_detect(iati_identifier, "GCRF-Clm") |  # Academies
-             #   str_detect(iati_identifier, "RS-GCRF|NEWT-RS") |  # Royal Society
-             #   str_detect(iati_identifier, "RAENG-GCRF|NEWT-RAE") |  # Royal Academy of Engineering
-        str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
+         str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
   ) %>%    
   filter(flow_type == "ODA") %>% 
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
@@ -173,6 +166,16 @@ ukri_projects_final <- ukri_projects_final %>%
          currency = "GBP",
          Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
                         if_else(Fund == "Newton", "Newton Fund", Fund)),
+         extending_org = case_when(
+           extending_org == "AHRC" ~ "Arts and Humanities Research Council (AHRC)",
+           extending_org == "BBSRC" ~ "Biotechnology and Biological Sciences Research Council (BBSRC)",
+           extending_org == "EPSRC" ~ "Engineering and Physical Sciences Research Council (EPSRC)",
+           extending_org == "ESRC" ~ "Economic and Social Research Council (ESRC)",
+           extending_org == "MRC" ~ "Medical Research Council (MRC)",
+           extending_org == "NERC" ~ "Natural Environment Research Council (NERC)",
+           extending_org == "STFC" ~ "Science and Technology Facilities Council (STFC)",
+           TRUE ~ extending_org
+         ),
          last_updated = as.Date(last_updated)) %>% 
   select(id,
          title, 

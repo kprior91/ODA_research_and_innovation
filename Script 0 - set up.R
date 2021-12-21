@@ -174,10 +174,7 @@ sector_extract <- function(page, sector_list) {
   return(sector_list)
 }
 
-# id <- "GB-1-205053-150"
-# id <- "GB-GOV-1-300708"
-# data <- iati_activity_extract(id)
-  
+
 # Function to extract IATI activity info from activity ID
 iati_activity_extract <- function(activity_id) {
   

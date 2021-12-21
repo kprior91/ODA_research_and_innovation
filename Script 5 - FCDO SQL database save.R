@@ -66,15 +66,17 @@ duplicates <- project_table %>%
 # remove duplicate rows (rough)
 project_table <- project_table[!duplicated(project_table$project_id), ] 
 
+saveRDS(project_table, file = "Outputs/project_table.rds")
 
 
 # 2) Create funder table ----
 
 funder_table <- all_projects_tidied %>% 
-  # remove all fields that can have multiple entries for a project
   select(project_id = id, funder = Funder, 
          fund = Fund, funder_iati_id = iati_id) %>% 
   unique()
+
+saveRDS(funder_table, file = "Outputs/funder_table.rds")
 
 
 # 3) Create organisation table ----
@@ -133,7 +135,7 @@ country_table_cleaned <- country_table_cleaned %>%
 # Replace country with "unknown" if not recognised against Tableau's accepted list
 country_table_final <- country_table_cleaned %>%
   mutate(Country = if_else(Country %in% dac_lookup$country_name, Country, "unknown")) %>% 
-  mutate(Country = tools::toTitleCase(Country)) %>% 
+  mutate(Country = tools::toTitleCase(Country)) %>%
   unique()
 
 # Remove unecessary unknowns

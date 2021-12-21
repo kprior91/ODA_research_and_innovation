@@ -1,23 +1,33 @@
 # --------------------------------------------------------------- #
 # Script 8 
 # Run automated tests on final ODA R&I project dataset
+# 
+# A) SET UP FUNCTIONS 
+# B) Script 1 - GOV FUNDER IATI RESEARCH ACTIVITIES
+# C) Script 4 - MASTER PROJECT DATASET
+# D) Script 5 - SQL tables
+# E) Script 6 - ACTIVE PROJECT EXTRACT FOR TABLEAU
+# 
 # --------------------------------------------------------------- #
 
 ### Create test comparisons
 
 gov_funders_expected <- c(
+                    "Cross-government Prosperity Fund",
                     "Department for Business, Energy and Industrial Strategy",
                     "Department for Environment, Food, and Rural Affairs",
                     "Department of Health and Social Care",
                     "Foreign, Commonwealth and Development Office")
 
-funds_expected <- c("FCDO Research - Partnerships", "FCDO Research - Programmes",                 
+funds_expected <- c("Chevening Scholarships",
+                    "FCDO Research - Programmes",                 
                     "Global Challenges Research Fund (GCRF)", "Global Health Research - Partnerships",      
                     "Global Health Research - Programmes", "Global Health Security - GAMRIF",            
                     "Global Health Security - UK Vaccine Network", "International Climate Finance (ICF)",        
-                    "Newton Fund")
+                    "Newton Fund", "Other")
 
-### TEST SET UP FUNCTIONS ----
+
+### A) SET UP FUNCTIONS ----
 
 ## LOOKUPS ##
 expect_equal(org_country_lookup("International Development Research Centre"), "Canada")
@@ -45,16 +55,18 @@ expect_equal(org_country_lookup("International Development Research Centre"), "C
 # test <- extract_ukri_projects_by_id(id)
 
 
-### GOV FUNDER IATI RESEARCH ACTIVITIES
+### B) GOV FUNDER IATI RESEARCH ACTIVITIES
 gov_list_final <- readRDS("Outputs/gov_list_final.rds")
 ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities.rds")
 
 test_that("UK government funder names are as expected", {
   
-  gov_funders_actual <- gov_list_final %>% 
-    filter(reporting_org %in% gov_funders_expected)
+  gov_funders_actual <- gov_list_final %>%
+    select(reporting_org) %>% 
+    unique() %>% 
+    arrange(reporting_org)
   
-  expect_equal(nrow(gov_list_final), nrow(gov_funders_actual))
+  expect_equal(gov_funders_expected, gov_funders_actual$reporting_org)
   
 })
 
@@ -62,12 +74,15 @@ test_that("UK government funder names are as expected", {
 
 test_that("fund names are as expected", {
   
-  gov_funds_actual <- gov_list_final %>% 
-    filter(fund %in% funds_expected) 
+  gov_funds_actual <- gov_list_final %>%
+    select(fund) %>% 
+    unique() %>% 
+    arrange(fund)
   
-  expect_equal(nrow(gov_list_final), nrow(gov_funds_actual))
+  expect_equal(funds_expected, gov_funds_actual$fund)
   
 })
+
 
 # Check how many UK gov funders are using the "RI" IATI tag
 
@@ -75,7 +90,34 @@ ri_tag_users <- unique(ri_iati_activities$reporting_org.ref)
 View(ri_tag_users)
 
 
-### MASTER DATASET ----
+# Check problematic IATI activity IDs 
+
+test_that("South Asia Research Country Fund data can be extracted", {
+  id <- "GB-1-205053"
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # not working
+
+test_that("Evidence Fund data can be extracted", {
+  id <- "GB-GOV-1-300708"
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # working
+
+test_that("LSE Int. Growth Centre data can be extracted", {
+  id <- "GB-COH-00070527-IGC-P3"
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # not working
+
+test_that("IDS example data can be extracted", {
+  id <- "GB-COH-877338-GV-GOV-1-300708-124" 
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # not working
+
+
+### C) MASTER DATASET ----
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
 # Check for specific project ID
@@ -215,11 +257,48 @@ test_that("South Asia Research Fund and Evidence Fund are present", {
 })
 
 
-### SQL tables ----
+### D) SQL tables ----
+
+# Connect to ODA RI Projects database on development server
+# (need to be connected to DFID VPN)
+
+con_live <- DBI::dbConnect(odbc::odbc(),
+                           Driver = "SQL Server", 
+                           Server   = "hel-sql-120",
+                           Database = "ODARIProjects",
+                           Trusted_Connection = "True")
 
 # Read in files for testing
+project_table <- readRDS("Outputs/project_table.rds")
+funder_table <- readRDS("Outputs/funder_table.rds")
+org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 country_table <- readRDS(file = "Outputs/country_table.rds")
 country_table_cleaned <- readRDS(file = "Outputs/country_table_cleaned.rds")
+
+# QA SQL tables
+
+test_that("number of rows in SQL tables is as expected", {
+  
+  recordSet <- dbSendQuery(con_live, "(SELECT 'PROJECT TABLE' AS LABEL
+                                              ,COUNT(*) FROM [Project])
+                                         UNION
+                                      (SELECT 'FUNDER TABLE' AS LABEL
+                                              ,COUNT(*) FROM [Funder])
+                                         UNION
+                                      (SELECT 'ORG TABLE' AS LABEL
+                                              ,COUNT(*) FROM [Organisation])
+                                                                  UNION
+                                      (SELECT 'COUNTRY TABLE' AS LABEL
+                                              ,COUNT(*) FROM [Country])")
+  
+  table_row_counts <- dbFetch(recordSet, n = -1)
+  
+  table_row_comp <- c(nrow(project_table), nrow(funder_table), nrow(org_names_and_locations),
+                      nrow(country_table_cleaned))
+  
+  expect_equal(table_row_counts, table_row_comp)
+
+})
 
 
 # Check country cleaning
@@ -246,8 +325,8 @@ test_that("check common country formatting issues", {
   corrected_3 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "300211-4"), country_type == 1)
   
-  print(paste0("Original text: ", original_1$country, " / ", original_2$country, " / ", original_3$country))
-  expect_equal(corrected_1$country, corrected_2$country, corrected_3$country,
+  print(paste0("Original text: ", original_1$Country, " / ", original_2$Country, " / ", original_3$Country))
+  expect_equal(corrected_1$Country, corrected_2$Country, corrected_3$Country,
                "democratic republic of the congo")
   
   print("Checking: Tanzania")
@@ -258,8 +337,8 @@ test_that("check common country formatting issues", {
   corrected_4 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "BB/S014586/1"), country_type == 1)
   
-  print(paste0("Original text: ", original_4$country))
-  expect_equal(corrected_4$country, "tanzania")
+  print(paste0("Original text: ", original_4$Country))
+  expect_equal(corrected_4$Country, "tanzania")
 
   
   print("Checking: China")
@@ -270,8 +349,8 @@ test_that("check common country formatting issues", {
   corrected_5 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "NF-BCCNPDEP-202"), country_type == 1)
   
-  print(paste0("Original text: ", original_5$country))
-  expect_equal(corrected_5$country, "china")
+  print(paste0("Original text: ", original_5$Country))
+  expect_equal(corrected_5$Country, "china")
   
   
   print("Checking: Korea")
@@ -282,8 +361,8 @@ test_that("check common country formatting issues", {
   corrected_6 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "GCRF-CICA-R12017-IC170195"), country_type == 1)
   
-  print(paste0("Original text: ", original_6$country))
-  countries <- paste0(corrected_6$country, collapse = "|")
+  print(paste0("Original text: ", original_6$Country))
+  countries <- paste0(corrected_6$Country, collapse = "|")
   expect_true(str_detect(countries, "democratic people’s republic of korea"))
   
   
@@ -307,11 +386,11 @@ test_that("check common country formatting issues", {
   corrected_9 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "us-ein-522044704-NewVaccinesForTB"), country_type == 1)
   
-  print(paste0("Original text: ", original_7$country, " / ", original_8$country))
-  expect_equal(corrected_7$country, corrected_8$country, "united states")
+  print(paste0("Original text: ", original_7$Country, " / ", original_8$Country))
+  expect_equal(corrected_7$Country, corrected_8$Country, "united states")
   
-  print(paste0("Original text: ", original_9$country))
-  countries <- paste0(corrected_9$country, collapse = "|")
+  print(paste0("Original text: ", original_9$Country))
+  countries <- paste0(corrected_9$Country, collapse = "|")
   expect_true(str_detect(countries, "united states"))
   
   
@@ -323,42 +402,37 @@ test_that("check common country formatting issues", {
   corrected_6 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "GB-CHC-222655-LIGHT"), country_type == 1)
   
-  print(paste0("Original text: ", original_6$country))
-  countries <- paste0(corrected_6$country, collapse = "|")
+  print(paste0("Original text: ", original_6$Country))
+  countries <- paste0(corrected_6$Country, collapse = "|")
   expect_false(str_detect(countries, "\\(the\\)"))
-
-  
-  # print("check project that should identify as UK")
-  # id == "103710"
-
 
 })
 
 
 # Check country separation
+# (sense check manually)
 
-test_that("all separating characters used", {
+test_that("all separating characters identified", {
  
   # ; separator
-  test13 <- country_table %>% 
+  test1 <- country_table %>% 
     filter(str_detect(project_id, "RWA-20054"))
   
-  test14 <- country_table_cleaned %>% 
+  test2 <- country_table_cleaned %>% 
     filter(str_detect(project_id, "RWA-20054")) 
   
+  View(test2)
+  View(test1)
+  
   # , separator
-  test13 <- country_table %>% 
+  test1 <- country_table %>% 
     filter(str_detect(project_id, "MR/S004769/1"))
   
-  test14 <- country_table_cleaned %>% 
-    filter(str_detect(project_id, "MR/S004769/1"))  
+  test2 <- country_table_cleaned %>% 
+    filter(str_detect(project_id, "MR/S004769/1")) 
   
-  # , at start
-  test13 <- country_table %>% 
-    filter(str_detect(project_id, "102204"))
-  
-  test14 <- country_table_cleaned %>% 
-    filter(str_detect(project_id, "102204"))  
+  View(test2)
+  View(test1)
   
 })
   
@@ -366,8 +440,8 @@ test_that("all separating characters used", {
 # (these will be overwritten as "unknown")
 
 unmatched_countries <- country_table_cleaned %>%
-  filter(!country %in% dac_lookup$country_name) %>% 
-  select(country) %>% 
+  filter(!(Country %in% dac_lookup$country_name)) %>% 
+  select(Country) %>% 
   unique()
 
 print(paste0("No. of unrecognised countries: ", nrow(unmatched_countries)))
@@ -398,16 +472,15 @@ test_that("only projects with no country information whatsoever are labelled unk
   expect_equal(length(unique(test4$country_type)), 2)
   expect_equal(nrow(test4), 2)  
   
-  # print("example 5: check Chevening") 
-  # test5 <- filter(country_table_final, str_detect(title, "Chevening"))
-  # expect_equal(length(unique(test5$country_type)), 2)
-  # expect_equal(nrow(test5), 2)   
+  print("example 5: check Chevening country location")
+  test5 <- filter(country_table_final, str_detect(project_id, "Chev"), country_type == 2)
+  expect_equal(unique(test5$Country), "United Kingdom")
   
 })
 
 
 
-### ACTIVE PROJECT EXTRACT FOR TABLEAU ----
+### E) ACTIVE PROJECT EXTRACT FOR TABLEAU ----
 tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
 
 # Check fund names
