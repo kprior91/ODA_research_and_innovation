@@ -15,8 +15,7 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.r
 # 1) Extract IATI projects ------------------------------------------------
 
 # Read in list of IATI activities (from UK gov funders and select delivery partners)
-iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds") %>% 
-  rename(recipient_country = all_countries)
+iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 
 # Filter gov department records for project-level activities

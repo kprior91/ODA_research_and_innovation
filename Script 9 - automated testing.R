@@ -117,6 +117,31 @@ test_that("IDS example data can be extracted", {
 })  # not working
 
 
+# Check IATI activities with multiple "General" descriptions
+
+activities_to_fix <- gov_list_unnest_1 %>% 
+  group_by(iati_identifier, activity_title, type.name) %>% 
+  summarise(no_descriptions = n()) %>% 
+  filter(no_descriptions > 1)
+
+# Identify activities with multiple budgets for the same period
+
+multiple_budgets <- gov_list_unnest_7 %>% 
+  group_by(iati_identifier, period_start, period_end) %>% 
+  summarise(count = n()) %>% 
+  filter (count > 1)
+
+# Example: one committed, one indicative budget for the same year. Should keep committed amount only
+# 	GB-GOV-10-RSTMH_SG_2020
+
+test <- filter(gov_list_unnest_7, iati_identifier == "GB-GOV-10-RSTMH_SG_2020")
+
+# Example: multiple committed budgets for the same period - should be summed 
+#   GB-GOV-13-NEWT-AMS_CHN_NAF0001
+
+test <- filter(gov_list_unnest_7, iati_identifier == "GB-GOV-13-NEWT-AMS_CHN_NAF0001")
+
+
 ### C) MASTER DATASET ----
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
 
