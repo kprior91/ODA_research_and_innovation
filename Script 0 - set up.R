@@ -92,7 +92,7 @@ dac_lookup <- read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xl
 ### Input data ----
 
 # FCDO partner IATI activities (to add manually as not linked) 
-iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
+unlinked_partner_iati_activity_ids <- read_xlsx("Inputs/IATI partner activities.xlsx", sheet=1)
 
 # UKRI non GCRF/Newton project IDs
 ukri_ooda_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1) %>% 

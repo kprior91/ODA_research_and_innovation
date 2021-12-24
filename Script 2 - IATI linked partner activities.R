@@ -1,19 +1,16 @@
 # --------------------------------------------------------------- #
 # Script 2
-# Extract IATI partner activities linked to RED programmes/components
-# by an incoming fund transaction activity ID
+# Extract IATI partner activities linked to UK gov funders' IATI activities
+# by an incoming fund transaction
 # --------------------------------------------------------------- #
 
-###
-# A) Create list of RED programmes and components -----
+# 1) Extract linked R&I partner IATI activities -----
 
-# Read in list of tagged RI RED components
-
+# Read in list of tagged RI UK gov funder activities from Script 1
 ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities.rds")
 
 
-###
-# B) Extract all linked activities ----
+# Extract linked partner activity IDs ----
 
 transactions_dataset <- data.frame()
 
@@ -34,7 +31,7 @@ for (id in ri_iati_activities$iati_identifier) {
   
   if (length(new_data) > 0) {
     new_data <- new_data %>% 
-      mutate(programme_id = id) %>% 
+      mutate(funding_iati_id = id) %>% 
       unique()
   }
   
@@ -46,21 +43,21 @@ for (id in ri_iati_activities$iati_identifier) {
   }
 }
 
-rm(request)
-rm(response)
-rm(new_data)
 
 
-###
-# C) Remove FCDO duplicate activities ----
+# 3) Keep partner activity IDs only (not duplicate gov funder ones) ----
 
-red_linked_activites <- transactions_dataset %>% 
-  filter(iati_identifier != programme_id) %>% 
-  select(programme_id,
-         linked_activity = iati_identifier)
+ri_linked_activites <- transactions_dataset %>% 
+  filter(iati_identifier != funding_iati_id) %>% 
+  select(funding_iati_id,
+         iati_id = iati_identifier) %>% 
+  unique()
 
-rm(transactions_dataset)
 
 # Save to Rdata file
-saveRDS(red_linked_activites, file = "Outputs/red_linked_activites.rds")
-# red_linked_activites <- readRDS(file = "Outputs/red_linked_activites.rds")
+saveRDS(ri_linked_activites, file = "Outputs/ri_linked_activites.rds")
+# ri_linked_activites <- readRDS(file = "Outputs/ri_linked_activites.rds")
+
+# Clear environment
+rm(ri_iati_activities, new_rows, page, path, id, x, y, request, response, new_data, transactions_dataset, 
+   ri_linked_activites)

@@ -20,17 +20,23 @@ while (page == 1 | new_rows > 0) {
   new_rows = y - x
 }
 
-# Keep research codes only (11)
+# Keep research/innovation/tech codes only (11)
 sector_list_research <- sector_list %>% 
   filter(str_detect(str_to_lower(name), "research") | 
            str_detect(str_to_lower(name), "higher education") |
            str_detect(str_to_lower(name), "information and communication technology"))
 
 
-# 2) Extract ALL activities by UK government publishers -----------
+# 2) Extract ALL activities from relevant UK government departments --------
 
 # Define UK government department IATI org IDs
-organisation_codes <- c("GB-GOV-1", "GB-GOV-7", "GB-GOV-10", "GB-GOV-13", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52")
+organisation_codes <- c("GB-GOV-1",  # FCDO
+                        "GB-GOV-7",  # Defra
+                        "GB-GOV-10", # DHSC
+                        "GB-GOV-12", # DCMS
+                        "GB-GOV-13", # BEIS
+                        "GB-GOV-15", # DIT
+                        "GB-GOV-50") # Prosperity Fund
 
 # Prepare output data frame
 uk_gov_list_final <- data.frame()
@@ -80,10 +86,10 @@ saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities.rds")
 uk_gov_list_filtered <- uk_gov_list_final %>% 
   select(-tag) %>% 
   left_join(ri_iati_activities, by = "iati_identifier") %>% 
-  filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-15", "GB-GOV-50", "GB-GOV-52", "GB-GOV-10") | # Include everything from these gov departments
+  filter((reporting_org.ref %in% c("GB-GOV-7", "GB-GOV-10", "GB-GOV-15", "GB-GOV-50") | # Include everything from these gov departments
           str_detect(iati_identifier, "GB-GOV-3") |                               # Include everything ex-FCDO
-          !is.na(tag) |                                                           # Tagged R&I programmes
-          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Keep BEIS Newton/GCRF and DHSC GHS/GHR activities
+          !is.na(tag) |                                                           # Include tagged R&I programmes
+          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Include BEIS Newton/GCRF and DHSC GHS/GHR activities
           default_flow_type == "ODA")                                             # Restrict to ODA funding only
 
 
@@ -100,23 +106,21 @@ gov_list_base <- uk_gov_list_filtered %>%
 gov_list_unnest_1 <- uk_gov_list_filtered %>% 
    # title
   filter(lengths(title.narrative) != 0) %>%
-  unnest(cols = title.narrative,
-         keep_empty = TRUE) %>% 
+  unnest(cols = title.narrative) %>% 
   rename(activity_title = text) %>% 
    # description
-  unnest(cols = description,
-         keep_empty = TRUE) %>% 
+  unnest(cols = description) %>% 
   mutate(type.name = coalesce(type.name, "General")) %>% 
   select(iati_identifier, activity_title, type.name, narrative) %>% 
-  unnest(cols = narrative,
-         keep_empty = TRUE) %>%     
+  unnest(cols = narrative) %>%     
   unique()
 
-      # Fix records with multiple "General" descriptions
+      # Summarise records with multiple "General" descriptions
       gov_list_unnest_1 <- gov_list_unnest_1 %>% 
             group_by(iati_identifier, activity_title, type.name) %>% 
             summarise(text = paste(coalesce(text, ""), collapse = "\n\n")) %>% 
             spread(key = type.name, value = text) %>% 
+            mutate(activity_description = if_else(!is.na(Objectives), paste0(General, "\n\n", Objectives), General)) %>% 
             ungroup()
 
 
@@ -126,8 +130,8 @@ gov_list_unnest_2 <- uk_gov_list_filtered %>%
   filter(lengths(recipient_country) != 0) %>%
   unnest(cols = recipient_country) %>% 
   select(iati_identifier, country.name) %>% 
-  group_by(iati_identifier) %>%
   unique() %>% 
+  group_by(iati_identifier) %>%
   summarise(recipient_country = paste(coalesce(country.name, ""), collapse = ", ")) %>% 
   ungroup()
 
@@ -137,7 +141,7 @@ gov_list_unnest_2 <- uk_gov_list_filtered %>%
 gov_list_unnest_3 <- uk_gov_list_filtered %>%
   filter(lengths(sector) != 0) %>%
   unnest(cols = sector) %>% 
-  select(iati_identifier, sector.name, percentage) %>% 
+  select(iati_identifier, sector.name) %>% 
   filter(sector.name %in% sector_list_research$name) %>%  # keep research sectors only
   unique() %>% 
   group_by(iati_identifier) %>%
@@ -159,12 +163,14 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
     # Add country locations based on IATI org references or lookup
     gov_list_unnest_4 <- gov_list_unnest_4 %>%
          # Extract 2 digit country code from org references (where populated)
-      mutate(country_code = if_else((!is.na(ref) & substr(ref,3,3) == "-" & !(substr(ref,1,2) %in% c("XI", "XM"))), substr(ref,1,2), "")) %>% 
+      mutate(country_code = if_else((!is.na(ref) & substr(ref,3,3) == "-" & !(substr(ref,1,2) %in% c("XI", "XM"))), 
+                                    substr(ref,1,2), "")) %>% 
          # Look up country from both country code and organisation name
       mutate(org_country_iati = map(country_code, country_code_to_name),
              org_country_other = map(text, org_country_lookup)) %>% 
       mutate(org_country_iati = unlist(org_country_iati),
              org_country_other = unlist(org_country_other)) %>% 
+        # Take best of both country lookup results
       mutate(partner_country = coalesce(org_country_iati, org_country_other)) %>% 
       select(-org_country_iati, -org_country_other)
 
@@ -270,7 +276,7 @@ gov_list <- gov_list_base %>%
   left_join(gov_list_unnest_7, by = "iati_identifier") %>% 
   left_join(gov_list_unnest_8, by = "iati_identifier")
 
-# Remove non-research activities for Defra, ex-FCO, Prosperity Fund etc. based on sector information
+# Remove non-research activities for all departments apart from BEIS, DHSC, FCDO based on sector information
 gov_list <- gov_list %>% 
   filter(reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10", "GB-GOV-13") & !str_detect(iati_identifier, "GB-GOV-3") |
            !is.na(sector_name))  
@@ -279,7 +285,7 @@ gov_list <- gov_list %>%
 gov_list <- gov_list %>% 
   select(reporting_org_ref, reporting_org, 
          iati_identifier, hierarchy, activity_status,
-         activity_title, General, Objectives, start_date, end_date,
+         activity_title, activity_description, start_date, end_date,
          recipient_country, sector_name,
          partner, partner_country, extending_org,
          amount, period_start, period_end, currency) %>% 
@@ -305,43 +311,47 @@ gov_list <- gov_list %>%
 gov_list <- gov_list %>%  
   mutate(reporting_org = case_when(
     reporting_org_ref == "GB-GOV-1" ~ "Foreign, Commonwealth and Development Office",
-    str_detect(reporting_org, "Health") ~ "Department of Health and Social Care",
-    str_detect(reporting_org, "Culture") ~ "Department for Digital, Culture, Media and Sport",
+    reporting_org_ref == "GB-GOV-10" ~ "Department of Health and Social Care",
+    reporting_org_ref == "GB-GOV-12" ~ "Department for Digital, Culture, Media and Sport",
     TRUE ~ reporting_org
   )) %>% 
   mutate(reporting_org = str_replace_all(reporting_org, "UK - ", ""))
 
 
 # 5) Account for parent-child hierarchies -----------
-# Extract detail at child activity level (if available) and ensure
-# spend is not being double-counted e.g. for DFID
+# Extract detail at child activity level (for DHSC and FCDO) and ensure
+# spend is not being double-counted for FCDO
 
 gov_list_final <- gov_list %>% 
-     # define FCDO programme activity ID
-  mutate(programme_id = if_else(hierarchy == 2, 
-                                substr(iati_identifier, 1, nchar(iati_identifier)-4), iati_identifier)) %>% 
-  filter(((reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10") & hierarchy == 2) | # FCDO, DHSC - keep components 
-            str_detect(iati_identifier, "GB-GOV-3") | # ex-FCO activities
-            reporting_org_ref %in% c("GB-GOV-7", "GB-GOV-12", "GB-GOV-13", "GB-GOV-50") |   # Defra, DCMS, BEIS, Prosperity Fund do not use child hierarchies
-            (reporting_org_ref %in% c("GB-GOV-10") & str_detect(iati_identifier, "GAMRIF|UKVN")) |
-            (reporting_org_ref %in% c("GB-GOV-10") & fund == "Other" & !is.na(amount))), # DHSC non-NIHR spend
-         !(hierarchy == 1 & str_detect(iati_identifier, "AMS|BA"))) # BEIS DP activities
+  filter((reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10") & hierarchy == 2) | # FCDO, DHSC - keep child activities 
+            str_detect(iati_identifier, "GB-GOV-3") |                           # keep ex-FCO activities
+            reporting_org_ref %in% c("GB-GOV-7", "GB-GOV-12", "GB-GOV-13", "GB-GOV-50")) # Defra, DCMS, BEIS, Prosperity Fund - keep parent activities
 
 
-# Join on FCDO programme descriptions at component level
-gov_list_final <- gov_list_final %>% 
-  left_join(select(gov_list, 
-                   iati_identifier, 
-                   programme_title = activity_title,
-                   programme_description = General), 
-            by = c("programme_id" = "iati_identifier")) %>% 
-  mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
-                                        programme_description,
-                                        General))
+# # Join on FCDO parent (programme) descriptions to child (component) activities
+# gov_list_final <- gov_list_final %>% 
+#      # Extract FCDO programme activity ID
+#   mutate(programme_id = if_else(hierarchy == 2 & reporting_org_ref == "GB-GOV-1", 
+#                                 substr(iati_identifier, 1, nchar(iati_identifier)-4), NA_character_)) %>% 
+#      # Join on programme title 
+#   left_join(select(gov_list_unnest_1, 
+#                    iati_identifier, 
+#                    programme_title = activity_title,
+#                    programme_description = activity_description), 
+#             by = c("programme_id" = "iati_identifier")) %>% 
+#   mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
+#                                         programme_description,
+#                                         activity_description))
   
+
 
 # 6) Save to Rdata file ----
 saveRDS(gov_list_final, file = "Outputs/gov_list_final.rds")
 # gov_list_final <- readRDS("Outputs/gov_list_final.rds") 
 
+# Clear environment variables
+rm(uk_gov_list_filtered, gov_list, gov_list_base, gov_list_unnest_1, gov_list_unnest_2, gov_list_unnest_3, 
+   gov_list_unnest_4, gov_list_unnest_4_partners, gov_list_unnest_4_countries, gov_list_unnest_5, gov_list_unnest_6, 
+   gov_list_unnest_7, gov_list_unnest_8, multiple_budgets, sector_list, sector_list_research, uk_gov_ri_programmes,
+   gov_list_final, organisation_codes, new_rows, page, x, y)
 

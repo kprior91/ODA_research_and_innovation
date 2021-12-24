@@ -616,11 +616,6 @@ all_projects_tidied <- all_projects_tidied %>%
   mutate(extending_org = if_else(extending_org == "GB-COH-877338", 
                                  "Institute of Development Studies", extending_org))
 
-# Remove WHO non-research/innovation activities
-all_projects_tidied <- all_projects_tidied %>% 
-  filter(!(extending_org == "World Health Organization") |
-           str_detect(title, "research|innovation"))
-
 # Add FCDO DevTracker links in absence of other public source
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(link = if_else((str_detect(iati_id, "GB-GOV-1-") | str_detect(iati_id, "GB-1-")) & is.na(link),
