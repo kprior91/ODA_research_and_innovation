@@ -65,13 +65,13 @@ org_code <- c(
         }
 
         saveRDS(org_activity_list, "Outputs/org_activity_list.rds")
-        ### TO FIX FROM BELOW ####
+        # org_activity_list <- readRDS("Outputs/org_activity_list.rds")
         
         # 2.A) Unlist activity titles and subset for those that mention FCDO/DFID
-        # (Gates only)
+        # (identifies FCDO-funded Gates Foundation activities)
 
         partner_activities_via_title <- org_activity_list %>%
-          filter(reporting_org.ref == "DAC-1601") %>%
+          filter(reporting_org.ref == "DAC-1601") %>%  # Gates org ID
           unnest(cols = title.narrative) %>%
           filter(str_detect(text, "FCDO|DFID")) %>%
           mutate(gov_funder = "Foreign, Commonwealth and Development Office",
@@ -117,10 +117,11 @@ org_code <- c(
         # Combine 2A and 2B
         partnership_activities <- plyr::rbind.fill(partner_activities_via_title, partner_activities_via_funder)
 
-        # Remove WHO non-research/innovation activities
+        # Remove World Health Organisation non-research/innovation activities
         partnership_activities <- partnership_activities %>% 
           filter(!(str_detect(iati_identifier, "XM-DAC-928")) |
-                   str_detect(text, "research|innovation"))
+                   str_detect(text, "research|innovation")) %>% 
+          select(-text)
         
         # Filter original data
         partnership_activities <- org_activity_list %>%
@@ -194,8 +195,6 @@ activity_list_unnest_2 <- partner_activity_comb %>%
   no_country_info <- partner_activity_comb %>% 
     filter(lengths(recipient_country) == 0)
   
-  # Extract transactions for these activities
-      
      # Prepare results data frame and counters
       transaction_list <- data.frame()
   
@@ -223,55 +222,35 @@ activity_list_unnest_2 <- partner_activity_comb %>%
                recipient_countries)
       
       # Unnest country information -----
-      transactions_country <- transaction_list_filtered %>% 
-        select(iati_identifier, recipient_countries, transaction_date, value) %>% 
+      transactions_by_country <- transaction_list_filtered %>% 
+          # unnest countries
         filter(lengths(recipient_countries) != 0) %>% 
         unnest(cols = recipient_countries) %>%
         select(-country.url, -country.code) %>% 
         rename(recipient_country = country.name) %>% 
         filter(!is.na(recipient_country)) %>% 
         unique()
-
-      # Unnest recipient org information -----  
-      transactions_orgs <- transaction_list_filtered %>% 
-        select(iati_identifier, receiver_organisation.narrative, transaction_date, value) %>% 
+      
+      # Unnest receiver organisation info (where populated)
+      transactions_by_country_and_org <- transactions_by_country %>% 
+          # unnest orgs
         filter(lengths(receiver_organisation.narrative) != 0) %>% 
         unnest(cols = receiver_organisation.narrative) %>% 
         select(-lang.code, -lang.name) %>% 
-        rename(receiver_org = text) %>%
-        filter(!is.na(receiver_org)) %>% 
         unique()
-  
-      # # Save transaction dataset (TO TROUBLESHOOT - CREATES DUPLICATES)
-      # transaction_list_to_save <- transaction_list_filtered %>% 
-      #   select(-recipient_countries, -receiver_organisation.ref, -receiver_organisation.narrative) %>% 
-      #   unique() %>% 
-      #   left_join(transactions_country, by = c("iati_identifier", "transaction_date", "value")) %>% 
-      #   left_join(transactions_orgs, by = c("iati_identifier", "transaction_date", "value"))
-      # 
-      # saveRDS(transaction_list_to_save, "Outputs/transaction_list_to_save.R")
-      
-      # Summarise info for joining to main dataset
-      transactions_summarised <- transaction_list_filtered %>% 
-        select(iati_identifier) %>% 
-        unique() %>% 
-        left_join((transactions_country %>% 
-                    select(-transaction_date, -value) %>% 
-                    unique() %>%
-                    group_by(iati_identifier) %>% 
-                    summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))), by = "iati_identifier") %>% 
-        left_join((transactions_orgs %>% 
-                    select(-transaction_date, -value) %>% 
-                    unique() %>%
-                    group_by(iati_identifier) %>% 
-                    summarise(receiver_org = paste(coalesce(receiver_org, ""), collapse = ", "))), by = "iati_identifier")        
 
+        saveRDS(transactions_by_country_and_org, "Outputs/transactions_by_country_and_org.R")
+  
+      # Summarise countries for joining to main dataset
+      transactions_by_country <- transactions_by_country %>% 
+        group_by(iati_identifier) %>% 
+        summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
       
 # Join on transactions country info to rest of dataset
 activity_list_unnest_2 <- partner_activity_comb %>% 
     select(iati_identifier) %>% 
     left_join(activity_list_unnest_2, by = "iati_identifier") %>% 
-    left_join(transactions_summarised, by = "iati_identifier") %>% 
+    left_join(transactions_by_country, by = "iati_identifier") %>% 
     mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
     select(-country_name)
   
@@ -290,6 +269,7 @@ activity_list_unnest_3 <- partner_activity_comb %>%
 
 # 4) Unlist implementing organisations
 activity_list_unnest_4 <- partner_activity_comb %>%
+  select(-activity_id) %>%  # newly added?
   filter(lengths(participating_org) != 0) %>% 
   unnest(cols = participating_org) %>% 
   select(iati_identifier, role.name, narrative, ref) %>% 
@@ -382,6 +362,7 @@ activity_list_unnest_5 <- partner_activity_comb %>%
     
 # 6) Unlist and aggregate budget
 activity_list_unnest_6 <- partner_activity_comb %>% 
+  select(-activity_id) %>% 
   filter(lengths(budget) != 0) %>% 
   unnest(cols = budget) %>% 
   select(iati_identifier, 

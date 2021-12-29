@@ -27,6 +27,7 @@ date <- "Dec21"
 # Read in datasets
 nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
 tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
+transactions_by_country_and_org <- readRDS("Outputs/transactions_by_country_and_org.rds") 
 
 # Abbrieviate/format organisation names
 tableau_projects_tidied <- tableau_projects_tidied %>% 
@@ -71,6 +72,7 @@ for(i in 1:length(country_list)) {
              link = coalesce(link, ""))
     
     output_report <- country_project_ids %>% 
+      left_join(country_transactions, by = c("id" = "iati_identifier")) %>% 
       mutate(lead_org_name = coalesce(lead_org_name, extending_org)) %>% 
       select(Funder, Fund, Programme = funder_programme,
              Title = title, Start, End, Description = abstract,
@@ -78,7 +80,7 @@ for(i in 1:length(country_list)) {
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
              `Value` = amount,
              `Web Link` = link,
-             Currency = currency) %>% 
+             Currency = currency, summary) %>% 
       group_by(Title, Funder) %>% 
       slice(1) %>% 
       ungroup() %>% 

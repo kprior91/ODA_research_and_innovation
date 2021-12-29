@@ -73,7 +73,7 @@ uk_gov_ri_programmes <- uk_gov_list_final %>%
 # Save list of tagged research & innovation activities
 ri_iati_activities <- uk_gov_ri_programmes %>% 
   filter(code == "RI") %>% 
-  select(iati_identifier) %>% 
+  select(iati_identifier, reporting_org.ref) %>% 
   unique() %>% 
   mutate(tag = "RI")
 

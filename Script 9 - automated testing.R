@@ -13,14 +13,13 @@
 ### Create test comparisons
 
 gov_funders_expected <- c(
-                    "Cross-government Prosperity Fund",
                     "Department for Business, Energy and Industrial Strategy",
                     "Department for Environment, Food, and Rural Affairs",
                     "Department of Health and Social Care",
                     "Foreign, Commonwealth and Development Office")
 
 funds_expected <- c("Chevening Scholarships",
-                    "FCDO Research - Programmes",                 
+                    "FCDO Research - Partnerships", "FCDO Research - Programmes",                 
                     "Global Challenges Research Fund (GCRF)", "Global Health Research - Partnerships",      
                     "Global Health Research - Programmes", "Global Health Security - GAMRIF",            
                     "Global Health Security - UK Vaccine Network", "International Climate Finance (ICF)",        
@@ -87,7 +86,7 @@ test_that("fund names are as expected", {
 # Check how many UK gov funders are using the "RI" IATI tag
 
 ri_tag_users <- unique(ri_iati_activities$reporting_org.ref)
-View(ri_tag_users)
+print(ri_tag_users)
 
 
 # Check problematic IATI activity IDs 
@@ -211,7 +210,7 @@ test_that("co-funded MRC project processed correctly", {
   mrc_cofunded_example <- filter(all_projects_tidied,
                                id == "MR/M009211/1")
 
-  mrc_common_info <- mrc_example_actual %>% 
+  mrc_common_info <- mrc_cofunded_example %>% 
     select(-Funder, -Fund, -iati_id) %>% 
     unique()
   
@@ -479,17 +478,17 @@ test_that("only projects with no country information whatsoever are labelled unk
   
   print("example 1: genuine unknown - Defra")
   test1 <- filter(country_table_final, str_detect(project_id, "GB-GOV-7-ICF-P0011-RD"))
-  expect_equal(unique(test1$Country), "Unknown")
+  expect_equal(unique(test1$country), "Unknown")
   expect_equal(nrow(test1), 2)
   
   print("example 2: known beneficiary, no known location")
   test2 <- filter(country_table_final, project_id == "GCRF-RAECHEPSSA-1819-3-HEPSSA2\\71") %>% arrange(country_type)
-  expect_equal(test2$Country, c("Nigeria", "Unknown"))
+  expect_equal(test2$country, c("Nigeria", "Unknown"))
   expect_equal(nrow(test2), 2)
   
   print("example 3: known location, no known beneficiary")
   test3 <- filter(country_table_final, project_id == "BB/R019819/1") %>% arrange(country_type)
-  expect_equal(test3$Country, c("Unknown", "United Kingdom"))
+  expect_equal(test3$country, c("Unknown", "United Kingdom"))
   expect_equal(nrow(test3), 2)
   
   print("example 4: known beneficiary and known location") 
@@ -499,7 +498,7 @@ test_that("only projects with no country information whatsoever are labelled unk
   
   print("example 5: check Chevening country location")
   test5 <- filter(country_table_final, str_detect(project_id, "Chev"), country_type == 2)
-  expect_equal(unique(test5$Country), "United Kingdom")
+  expect_equal(unique(test5$country), "United Kingdom")
   
 })
 
@@ -520,13 +519,13 @@ test_that("fund names are as expected", {
 })
 
 # Check country_type field
-test_that("country_type field has 3 types", {
+test_that("country_type field has 2 types", {
   
   country_types <- tableau_projects_tidied$country_type %>% 
     unique() %>% 
     sort()
   
-  expect_equal(country_types, c(1,2,3))
+  expect_equal(country_types, c(1,2))
   
 })
 
@@ -567,7 +566,7 @@ test_that("no GBP currency typo", {
 
 test_that("check active projects are included only", {
   
-  status_actual <- unique(all_projects_tidied$status)
+  status_actual <- unique(tableau_projects_tidied$status)
   status_expected <- c("Active", "Unknown")
   
   expect_equal(status_actual, status_expected)
