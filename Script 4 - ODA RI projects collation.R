@@ -25,7 +25,6 @@ iati_projects <- iati_activity_list %>%
          str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
          str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
   ) %>%    
-  filter(flow_type == "ODA") %>% 
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
   plyr::rbind.fill(partner_iati_list) # Add partner activities
 
@@ -240,28 +239,67 @@ rm(ukri_projects_ids)
 # 3) Extract NIHR projects ------------------------------------------------
 
 # Define URL to extract ODA projects
-path <- paste0("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&facet=pconnm&refine.funder=NIHR+(ODA)")
+paths <- c("https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=infonihr-open-dataset&q=&rows=6000&facet=funder&facet=project_status&facet=programme&facet=programme_type&facet=programme_stream&facet=start_date&facet=acronym&facet=ctry17nm&facet=rgn17nm&facet=lad19nm&facet=pconnm&refine.funder=NIHR+(ODA)"
+          ,"https://nihr.opendatasoft.com/api/records/1.0/search/?dataset=nihr-open-data-global-health-downstream-partner-data&q=&rows=6000&facet=institutionname&facet=institutioncity&facet=institutioncountry&facet=projectref")
+
 
 # Extract data from the NIHR API
-request <- GET(url = path)
-request$status_code # 200 = success
+  
+  # Set counter and create output list
+  i <- 1
+  nihr_data <- list()
 
-# Convert to text and read from JSON
-response <- content(request, as = "text", encoding = "UTF-8")
-response <- fromJSON(response, flatten = TRUE) 
+for (path in paths) {
+  
+  request <- GET(url = path)
+  
+  # Convert to text and read from JSON
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  
+  # Extract dataframe
+  data <- response$records 
+  
+  # Remove "field." from column names
+  names(data) <- gsub(pattern = "fields.", replacement = "", x = names(data))
+  
+  # Save output to list
+  nihr_data[[i]] <- data
+ 
+  i <- i+1
+  
+}
 
-# Extract dataframe
-nihr_projects <- response$records 
+# Extract projects and partners datasets  
+nihr_projects <- nihr_data[[1]]
+nihr_partners <- nihr_data[[2]] %>% 
+  select(project_id = projectref, 
+         organisation_name = institutionname, 
+         organisation_country = institutioncountry) %>% 
+  unique()
 
-# Remove unneeded columns
-nihr_projects <- nihr_projects %>% 
-  select(-1, -2) 
+  nihr_partners_names = nihr_partners %>% 
+    select(project_id, organisation_name) %>% 
+    unique() %>% 
+    group_by(project_id) %>% 
+    summarise(organisation_name = paste(coalesce(organisation_name, ""), collapse = ", "))
+  
+  nihr_partners_countries = nihr_partners %>% 
+    select(project_id, organisation_country) %>% 
+    unique() %>% 
+    group_by(project_id) %>% 
+    summarise(organisation_country = paste(coalesce(organisation_country, ""), collapse = ", ")) 
+  
+  nihr_partners_comb <- nihr_partners_names %>% 
+    left_join(nihr_partners_countries, by = "project_id")
 
-# Remove "field." from column names
-names(nihr_projects) <- gsub(pattern = "fields.", replacement = "", x = names(nihr_projects))
+# Join datasets
+nihr_projects_final <- nihr_projects %>% 
+  left_join(nihr_partners_comb, by = "project_id")
+
 
 # Select order of columns
-nihr_projects_final <- nihr_projects %>% 
+nihr_projects_final <- nihr_projects_final %>% 
   mutate(id = project_id,
          Funder = "Department of Health and Social Care",
          Fund = "Global Health Research - Programmes",
@@ -275,8 +313,8 @@ nihr_projects_final <- nihr_projects %>%
                                   if_else(project_status %in% c("Discontinued"), "Cancelled", "Unknown"))),
          period_start = NA_character_,
          period_end = NA_character_,
-         partner_org_name = NA_character_,
-         partner_org_country = NA_character_,
+         partner_org_name = organisation_name,
+         partner_org_country = organisation_country,
          extending_org = "NIHR",
          last_updated = as.Date(record_timestamp)) %>% 
   select(id, 
@@ -308,7 +346,10 @@ org_names_and_locations_3 <- nihr_projects_final %>%
                     select(project_id = id,
                            organisation_name = lead_org_name,
                            organisation_country = lead_org_country) %>% 
-                    mutate(organisation_role = 1)
+                    mutate(organisation_role = 1) %>% 
+                    rbind(mutate(nihr_partners,
+                                 organisation_role = 2))
+
 
 # Save as R file (to read back in if needed)
 saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final.rds")
