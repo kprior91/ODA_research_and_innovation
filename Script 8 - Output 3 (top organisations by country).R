@@ -1,0 +1,14 @@
+
+# Script to pull off lists of most common organisations by country
+
+country <- c("Indonesia")
+
+country_orgs <- org_names_and_locations %>% 
+  filter(organisation_country %in% country,
+         project_id %in% all_projects_tidied$id)
+
+country_orgs_summarised <- country_orgs %>% 
+  group_by(organisation_name) %>% 
+  summarise(no_projects = n()) %>% 
+  arrange(-no_projects)
+

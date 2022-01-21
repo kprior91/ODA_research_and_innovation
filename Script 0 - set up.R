@@ -105,6 +105,13 @@ wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 roda_extract_gcrf <- read_excel("Inputs/BEIS_GCRF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
 roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
 
+# DHSC Global Health Security projects
+dhsc_ghs_projects <- read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)
+
+# FCDO core contribution programmes/components 
+# (these are out of scope of IATI)
+fcdo_non_iati_programmes <- read_excel("Inputs/FCDO core contribution programmes (with beneficiary countries).xlsx") 
+
 
 ### Functions -----
 

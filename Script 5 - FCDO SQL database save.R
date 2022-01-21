@@ -183,3 +183,8 @@ dbAppendTable(con_live, "Country", country_table_final, row.names = NULL)
 dbDisconnect(con_live)
 
 
+# Clear environment
+rm(duplicates, identify_multiples, identify_unknowns_to_delete,
+   country_table, country_table_cleaned, country_table_final)
+
+

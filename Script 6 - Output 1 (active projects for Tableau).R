@@ -26,8 +26,6 @@ project_country_unknowns <- filter(tableau_projects, Country == "Unknown") %>%
 tableau_projects <- tableau_projects %>% 
   filter(id %in% project_country_unknowns$id | Country != "Unknown") 
 
-rm(unknown_country_projects)
-rm(duplicate_country_projects)
 
 # 3) Add funder programme names ------------------
 

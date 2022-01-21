@@ -19,15 +19,16 @@
 ## IIOD countries
 # country_list <- c("India", "Nepal", "Bangladesh", "Bhutan", "Sri Lanka", "Maldives")
 
+## Colombia
+# country_list <- c("Colombia")
+
 
 # Define strings for use in output file name
-string <- "IIOD"
-date <- "Dec21"
+string <- "Colombia"
+date <- "Jan22"
 
 # Read in datasets
-nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
 tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
-transactions_by_country_and_org <- readRDS("Outputs/transactions_by_country_and_org.rds") 
 
 # Abbrieviate/format organisation names
 tableau_projects_tidied <- tableau_projects_tidied %>% 
@@ -58,21 +59,14 @@ for(i in 1:length(country_list)) {
 
     print(paste0(i, " - ", country_list[i]))
   
-    # (workaround until overseas partner info on NIHR Open Data)
-    nihr_country_projects <- nihr_projects_final %>% 
-      filter(str_detect(title, country_list[i]) | str_detect(abstract, country_list[i]),
-             status == "Active")
-  
     # Extract project data for selected country
     country_project_ids <- tableau_projects_tidied %>% 
-      filter(Country == country_list[i] |
-             id %in% nihr_country_projects$id) %>% 
+      filter(Country == country_list[i]) %>% 
       mutate(Start = as.numeric(as.character(format(as.Date(start_date), format = "%Y"))),
              End = as.numeric(as.character(format(as.Date(end_date), format = "%Y"))),
              link = coalesce(link, ""))
     
     output_report <- country_project_ids %>% 
-      left_join(country_transactions, by = c("id" = "iati_identifier")) %>% 
       mutate(lead_org_name = coalesce(lead_org_name, extending_org)) %>% 
       select(Funder, Fund, Programme = funder_programme,
              Title = title, Start, End, Description = abstract,
@@ -80,7 +74,7 @@ for(i in 1:length(country_list)) {
              `Lead Organisation` = lead_org_name, `Partner Organisations` = partner_org_name,
              `Value` = amount,
              `Web Link` = link,
-             Currency = currency, summary) %>% 
+             Currency = currency) %>% 
       group_by(Title, Funder) %>% 
       slice(1) %>% 
       ungroup() %>% 

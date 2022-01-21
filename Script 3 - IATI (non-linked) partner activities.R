@@ -239,10 +239,12 @@ activity_list_unnest_2 <- partner_activity_comb %>%
         select(-lang.code, -lang.name) %>% 
         unique()
 
-        saveRDS(transactions_by_country_and_org, "Outputs/transactions_by_country_and_org.R")
+        saveRDS(transactions_by_country_and_org, "Outputs/transactions_by_country_and_org.rds")
   
       # Summarise countries for joining to main dataset
       transactions_by_country <- transactions_by_country %>% 
+        select(iati_identifier, recipient_country) %>% 
+        unique() %>% 
         group_by(iati_identifier) %>% 
         summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
       
@@ -463,4 +465,4 @@ rm(partner_activity_extract, partnership_activities, partner_activities_via_titl
    result, new_rows, x, y, page, ri_linked_activites,
    activity_list_base, activity_list_unnest_1, activity_list_unnest_2, activity_list_unnest_3, activity_list_unnest_4,
    activity_list_unnest_4_partner_countries, activity_list_unnest_4_partner_names, activity_list_unnest_5,
-   activity_list_unnest_6, activity_list_unnest_7)
+   activity_list_unnest_6, activity_list_unnest_7, unlinked_partner_iati_activity_ids)

@@ -1,12 +1,12 @@
 # --------------------------------------------------------------- #
 # Script 4 
 # Extract and collate ODA R&I award level data from
-# - IATI Registry 
+# - IATI Registry (UK government funder and external partner activities)
 # - UKRI Gateway to Research
 # - NIHR Open Data
-# - Wellcome Trust (spreadsheet)
-# - FCDO partners (spreadsheets)
-# - BEIS (RODA)
+# - Wellcome Trust (spreadsheet input)
+# - DHSC Global Health Security (non-UKRI projects) (spreadsheet input)
+# - BEIS GCRF and Newton Fund (spreadsheet input)
 # --------------------------------------------------------------- #
 
 # Read in org names and countries from previous script
@@ -17,13 +17,12 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.r
 # Read in list of IATI activities (from UK gov funders and select delivery partners)
 iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
+fcdo_non_iati_ids <- paste0(fcdo_non_iati_programmes$iati_identifier, collapse = "|")
 
 # Filter gov department records for project-level activities
 iati_projects <- iati_activity_list %>%
-  filter(str_detect(iati_identifier, "GB-GOV-3") |   # ex-FCO activities
-         str_detect(iati_identifier, "1-205053") |   # South Asia Country Research Fund (FCDO)
-         str_detect(iati_identifier, "1-300708") |   # Evidence Fund (FCDO)  
-         str_detect(iati_identifier, "GB-GOV-7")     # Defra activities
+  filter(str_detect(iati_identifier, "GB-GOV-3|GB-GOV-7") |   # keep ex-FCO and Defra activities
+         str_detect(iati_identifier, fcdo_non_iati_ids)       # keep FCDO programmes/components out of scope of IATI 
   ) %>%    
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
   plyr::rbind.fill(partner_iati_list) # Add partner activities
@@ -37,6 +36,13 @@ ukri_iati_projects <- iati_activity_list %>%
   select(gtr_id, iati_identifier, recipient_country) %>% 
   unique()
 
+# Add on beneficiary countries for FCDO non-IATI programmes
+iati_projects <- iati_projects %>% 
+  left_join(fcdo_non_iati_programmes, by = "iati_identifier") %>% 
+  mutate(recipient_country = coalesce(recipient_country, str_to_title(fcdo_geocoding_countries))) %>% 
+  select(-programme_name, -fcdo_geocoding_countries)
+
+
 # Keep required fields
 iati_projects_final <- iati_projects %>% 
   mutate(Funder = coalesce(gov_funder, reporting_org),
@@ -47,6 +53,7 @@ iati_projects_final <- iati_projects %>%
          extending_org = coalesce(extending_org, reporting_org),
          status = if_else(!is.na(end_date),
                           if_else(Sys.Date() <= end_date, "Active", "Closed"), "Unknown"),
+         iati_id = coalesce(programme_id, iati_identifier),
          last_updated = quarter_end_date) %>% 
   select(id = iati_identifier,
          title = activity_title, 
@@ -62,7 +69,7 @@ iati_projects_final <- iati_projects %>%
          lead_org_country,
          partner_org_name,
          partner_org_country,
-         iati_id = programme_id,
+         iati_id,
          Fund = fund,
          Funder, 
          recipient_country,
@@ -75,10 +82,8 @@ iati_projects_final <- iati_projects %>%
 iati_projects_final <- iati_projects_final %>% 
   mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
 
-# Clean up
-rm(iati_activity_list)
-rm(partner_iati_list)
-rm(iati_projects)
+# Clear environment
+rm(iati_activity_list, partner_iati_list, iati_projects)
 
 
 # 2) Extract UKRI projects -------------------------------------------
@@ -133,6 +138,10 @@ for (id in ukri_projects_ids_full$gtr_id) {
 
 saveRDS(ukri_projects_by_id, file = "Outputs/ukri_projects_by_id.rds")
 # ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id.rds") 
+
+# Save org names and countries to file
+saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
+# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
 
 
 ### C - Add on fund and funder labels
@@ -219,21 +228,12 @@ ukri_projects_with_countries <- ukri_projects_final %>%
 saveRDS(ukri_projects_with_countries, file = "Outputs/ukri_projects_with_countries.rds")
 # ukri_projects_with_countries <- readRDS("Outputs/ukri_projects_with_countries.rds") 
 
-# Save org names and countries to file
-saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2.rds")
-# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
 
-
-rm(data)
-rm(n)
-rm(id)
-rm(missing_awards)
-rm(ukri_gcrf_newton_ids)
-rm(ukri_projects_by_fund)
-rm(ukri_projects_by_fund_with_id)
-rm(ukri_projects_by_id)
-rm(ukri_projects_by_id_with_id)
-rm(ukri_projects_ids)
+# Clear environment
+rm(data, n, id, missing_awards, ukri_projects_by_fund,
+   ukri_projects_by_id, ukri_projects_by_id_with_id,
+   ukri_projects_ids_full,
+   ukri_ooda_projects_ids, ukri_iati_projects)
 
 
 # 3) Extract NIHR projects ------------------------------------------------
@@ -356,9 +356,10 @@ saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final.rds")
 # nihr_projects_final <- readRDS("Outputs/nihr_projects_final.rds") 
 
 
-rm(nihr_projects)
-rm(request)
-rm(response)
+# Clear environment
+rm(paths, i, nihr_data, nihr_projects, nihr_partners, nihr_partners_comb,
+   nihr_partners_names, nihr_partners_countries, nihr_country_projects,
+   request, response)
 
 
 # 4) Extract Wellcome projects ------------------------------------------------
@@ -442,25 +443,17 @@ org_names_and_locations_3 <- org_names_and_locations_3 %>%
                organisation_country = partner_org_country) %>% 
           mutate(organisation_role = 2))
 
-rm(wellcome_grants)
-rm(wellcome_grants_formatted)
 
-# 5) FCDO spreadsheet data
+# Clear environment
+rm(wellcome_grants, wellcome_grants_formatted, wellcome_partners)
 
-# Detect all Excel files in Data folder
-path = "Inputs//IATI returns"
-file_list <- list.files(path = path, pattern='*.xlsx', full.names = TRUE)
 
-# Read all files into R
-data_list <- lapply(file_list, 
-                    read_excel, 
-                    sheet = 2)
 
-# Bind the rows, adding an ID field for the Excel file number
-partner_spreadsheet_data <- bind_rows(data_list, .id = "file_number")
+# 5) DHSC Global Health Security data (spreadsheet) -----
+# (Covers non-UKRI GAMRIF and UK Vaccine Network projects)
 
 # Reformat to match other dataset
-collated_spreadsheet_data <- partner_spreadsheet_data %>% 
+dhsc_ghs_projects_final <- dhsc_ghs_projects %>% 
   rename(id = `Extending organisation - award ID`,
          title = `Award title`,
          abstract = `Award description`,
@@ -485,25 +478,23 @@ collated_spreadsheet_data <- partner_spreadsheet_data %>%
          status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
          last_updated = quarter_end_date
          ) %>% 
-  select(-`No.`, -`Funder programme - name`, -Notes, -file_number, -Currency,
-         -`Aims/Objectives`, -`Investigator(s) - name`, -`FCDO programme - name`,
-         -`FCDO programme - IATI ID`, -Link)
+  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`)
 
 
 # Save as R file (to read back in if needed)
-saveRDS(collated_spreadsheet_data, file = "Outputs/collated_spreadsheet_data.rds")
-# collated_spreadsheet_data <- readRDS("Outputs/collated_spreadsheet_data.rds") 
+saveRDS(dhsc_ghs_projects_final, file = "Outputs/dhsc_ghs_projects_final.rds")
+# dhsc_ghs_projects_final <- readRDS("Outputs/dhsc_ghs_projects_final.rds") 
 
 # Write lead org names and countries to file
 org_names_and_locations_3 <- org_names_and_locations_3 %>% 
-  rbind(select(collated_spreadsheet_data,
+  rbind(select(dhsc_ghs_projects_final,
                project_id = id,
                organisation_name = lead_org_name,
                organisation_country = lead_org_country) %>% 
           mutate(organisation_role = 1))
 
 # Write partner org names and countries to file (where simple to do)
-spreadsheet_partners <- collated_spreadsheet_data %>% 
+dhsc_partners <- dhsc_ghs_projects_final %>% 
   select(id, partner_org_name, partner_org_country) %>% 
   # Exclude missings, multiple and miscellaneous partners
   filter(!is.na(partner_org_name),
@@ -511,18 +502,17 @@ spreadsheet_partners <- collated_spreadsheet_data %>%
          !str_detect(partner_org_country, ",|;|N/A")) 
 
 org_names_and_locations_3 <- org_names_and_locations_3 %>% 
-  rbind(select(spreadsheet_partners,
+  rbind(select(dhsc_partners,
                project_id = id,
                organisation_name = partner_org_name,
                organisation_country = partner_org_country) %>% 
           mutate(organisation_role = 2))
 
-rm(partner_spreadsheet_data)
-rm(data_list)
-rm(file_list)
+# Clear environment
+rm(dhsc_ghs_projects, dhsc_partners)
 
 
-# 6) BEIS RODA data (spreadsheet)
+# 6) BEIS RODA GCRF/Newton non-UKRI data (by spreadsheet) -----
 
 # Reformat to match other datasetS
 roda_extract_gcrf_final <- roda_extract_gcrf %>% 
@@ -543,9 +533,9 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          partner_org_country = NA_character_,
          iati_id = NA_character_,
          currency = "GBP",
-         status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
-                          if_else(Status %in% c("Completed"), "Closed", 
-                                  if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
+         status = if_else(`Activity status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(`Activity status` %in% c("Completed"), "Closed", 
+                                  if_else(`Activity status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = NA_character_,
          period_end = NA_character_,
          subject = NA_character_,
@@ -557,7 +547,7 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
   mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, NA_character_)) %>%
     # remove unecessary variables
   select(-Level, -`Recipient region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
-         -`Actual end date`, -Status)
+         -`Actual end date`, -`Activity status`)
 
 
 roda_extract_newton_final <- roda_extract_newton %>% 
@@ -568,7 +558,7 @@ roda_extract_newton_final <- roda_extract_newton %>%
          recipient_country = `Recipient country`,
          extending_org = `Delivery partner`,
          lead_org_name = `Lead Organisation`,
-         partner_org_name = `Partner organisations`) %>% 
+         partner_org_name = `Country delivery partners`) %>% 
   mutate(Fund = "Newton Fund",
          Funder = "Department for Business, Energy and Industrial Strategy",
          lead_org_country = map(lead_org_name, org_country_lookup),
@@ -578,9 +568,9 @@ roda_extract_newton_final <- roda_extract_newton %>%
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          currency = "GBP",
-         status = if_else(Status %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
-                          if_else(Status %in% c("Completed"), "Closed", 
-                                  if_else(Status %in% c("Cancelled"), "Cancelled", "Unknown"))),
+         status = if_else(`Activity status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(`Activity status` %in% c("Completed"), "Closed", 
+                                  if_else(`Activity status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = NA_character_,
          period_end = NA_character_,
          subject = NA_character_,
@@ -589,7 +579,7 @@ roda_extract_newton_final <- roda_extract_newton %>%
   # suppress display of end dates that have passed
   mutate(end_date = if_else(Sys.Date() <= end_date, end_date, NA_character_)) %>%
   
-  select(-Level, -`Recipient region`, -`Planned start date`, -Status,
+  select(-Level, -`Recipient region`, -`Planned start date`, -`Activity status`,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
 
 # Write lead org names and countries to file
@@ -609,9 +599,8 @@ org_names_and_locations_3 <- org_names_and_locations_3 %>%
 saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3.rds")
 # org_names_and_locations_3 <- readRDS("Outputs/org_names_and_locations_3.rds") 
 
-
-rm(roda_extract_gcrf)
-rm(roda_extract_newton)
+# Clear environment
+rm(roda_extract_gcrf, roda_extract_newton)
 
 
 # 7) Join funder datasets together ----------------------------------------------
@@ -620,7 +609,7 @@ all_projects <- rbind(ukri_projects_with_countries,
                       nihr_projects_final, 
                       iati_projects_final, 
                       wellcome_grants_final,
-                      collated_spreadsheet_data,
+                      dhsc_ghs_projects_final,
                       roda_extract_gcrf_final, roda_extract_newton_final) %>% 
   unique() %>% 
   ungroup()
@@ -655,7 +644,9 @@ all_projects_tidied <- all_projects_tidied %>%
 # Correct missing IDS name (ARPA activity)
 all_projects_tidied <- all_projects_tidied %>% 
   mutate(extending_org = if_else(extending_org == "GB-COH-877338", 
-                                 "Institute of Development Studies", extending_org))
+                                 "Institute of Development Studies", extending_org),
+         lead_org_name = if_else(lead_org_name == "GB-COH-877338", 
+                                 "Institute of Development Studies", lead_org_name))
 
 # Add FCDO DevTracker links in absence of other public source
 all_projects_tidied <- all_projects_tidied %>% 
@@ -676,4 +667,11 @@ org_names_and_locations <- rbind(org_names_and_locations_1, org_names_and_locati
   unique()
 
 saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
+
+
+# Clear environment
+rm(org_names_and_locations_1, org_names_and_locations_2, org_names_and_locations_3, 
+   org_names_and_locations)
+
+
 

@@ -502,6 +502,10 @@ test_that("only projects with no country information whatsoever are labelled unk
   
 })
 
+# Test FCDO geocoding for core contribution programmes (out of scope of IATI)
+
+test <- filter(iati_projects_final, str_detect(id, "GB-1-203051"))
+
 
 
 ### E) ACTIVE PROJECT EXTRACT FOR TABLEAU ----
