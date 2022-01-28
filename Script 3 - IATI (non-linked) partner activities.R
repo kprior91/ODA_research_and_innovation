@@ -238,7 +238,9 @@ activity_list_unnest_2 <- partner_activity_comb %>%
         unnest(cols = receiver_organisation.narrative) %>% 
         select(-lang.code, -lang.name) %>% 
         unique()
-
+        
+        # Save dataset to file (this is not currently used, but is a rich information
+        # source for sub-project detail)
         saveRDS(transactions_by_country_and_org, "Outputs/transactions_by_country_and_org.rds")
   
       # Summarise countries for joining to main dataset

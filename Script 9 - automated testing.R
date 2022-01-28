@@ -29,6 +29,8 @@ funds_expected <- c("Chevening Scholarships",
 ### A) SET UP FUNCTIONS ----
 
 ## LOOKUPS ##
+
+# Test organisation name to country lookup
 expect_equal(org_country_lookup("International Development Research Centre"), "Canada")
 
 

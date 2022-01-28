@@ -603,19 +603,51 @@ saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3.rds
 rm(roda_extract_gcrf, roda_extract_newton)
 
 
-# 7) Join funder datasets together ----------------------------------------------
+# 7) FCDO problematic IATI activities
+
+extra_fcdo_projects <- fcdo_problematic_iati_activities %>% 
+  rename(id = `Extending organisation - award ID`,
+         title = `Award title`,
+         abstract = `Award description`,
+         start_date = `Start date`,
+         end_date = `End date`,
+         amount = `Award amount (£)`,
+         recipient_country = `Beneficiary country`,
+         extending_org = `Extending organisation - name`,
+         lead_org_name = `Lead organisation - name`,
+         lead_org_country = `Lead organisation - country`,
+         partner_org_name = `Implementing partner(s) - name`,
+         partner_org_country = `Implementing partner(s) - country`,
+         iati_id = `Funder programme - IATI ID`,
+         link = `Data source`
+  ) %>% 
+  mutate(start_date = as.character(start_date),
+         end_date = as.character(end_date),
+         currency = coalesce(Currency, "GBP"),
+         period_start = NA_character_,
+         period_end = NA_character_,
+         subject = NA_character_,
+         status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
+         last_updated = quarter_end_date
+  ) %>% 
+  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`)
+
+
+
+# 8) Join funder datasets together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_with_countries, 
                       nihr_projects_final, 
                       iati_projects_final, 
                       wellcome_grants_final,
                       dhsc_ghs_projects_final,
-                      roda_extract_gcrf_final, roda_extract_newton_final) %>% 
+                      roda_extract_gcrf_final, roda_extract_newton_final,
+                      extra_fcdo_projects) %>% 
   unique() %>% 
   ungroup()
 
 
-# 8) Manual exclusions and formatting -------------------------------------------
+# 9) Manual exclusions and formatting -------------------------------------------
 
 # Manually edit country info for Chevening Scholarships
 all_projects_tidied <- all_projects %>% 
@@ -654,7 +686,7 @@ all_projects_tidied <- all_projects_tidied %>%
                         paste0("https://devtracker.fcdo.gov.uk/projects/", iati_id, "/summary"), link))
 
 
-# 9) Save datasets -------------------------------------------
+# 10) Save datasets -------------------------------------------
 
 saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied.rds")
 # all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
