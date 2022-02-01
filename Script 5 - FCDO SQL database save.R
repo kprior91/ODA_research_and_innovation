@@ -18,22 +18,6 @@ con_live <- DBI::dbConnect(odbc::odbc(),
                             Trusted_Connection = "True")
   
 
-# View data extracts from current tables
-
-# causes error (?)
-# recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Project]") 
-# project_first_10 <- dbFetch(recordSet, n = -1)
-
-recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Funder]")
-funder_first_10 <- dbFetch(recordSet, n = -1)
-
-recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Organisation]")
-org_first_10 <- dbFetch(recordSet, n = -1)
-
-recordSet <- dbSendQuery(con_live, "SELECT TOP 10 * FROM [Country]")
-country_first_10 <- dbFetch(recordSet, n = -1)
-
-
 # 1) Create master project table ----
 project_table <- all_projects_tidied %>% 
   # remove all fields that can have multiple entries for a project

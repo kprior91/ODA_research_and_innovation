@@ -2,10 +2,23 @@
 # Estimate total funding across ODA R&I portfolio
 ##########
 
+# Read in active project data
+tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
+
+
 ### 1) UKRI - GCRF/Newton ---
-ukri_gcrf_newton <- ukri_projects_final %>% 
+ukri_gcrf_newton <- tableau_projects_tidied %>% 
   filter(Fund %in% c("Global Challenges Research Fund (GCRF)", "Newton Fund"),
-         status == "Active") %>% 
+         extending_org %in% c(
+           "Arts and Humanities Research Council (AHRC)",
+           "Biotechnology and Biological Sciences Research Council (BBSRC)",
+           "Engineering and Physical Sciences Research Council (EPSRC)",
+           "Economic and Social Research Council (ESRC)",
+           "Medical Research Council (MRC)",
+           "Natural Environment Research Council (NERC)",
+           "Science and Technology Facilities Council (STFC)",
+           "Innovate UK"
+         )) %>% 
   select(id, amount) %>% 
   unique()
 
@@ -14,22 +27,40 @@ sum(ukri_gcrf_newton$amount, na.rm = TRUE)
 
 
 ### 2) UKRI - FCDO ---
-ukri_fcdo <- ukri_projects_final %>% 
+ukri_fcdo <- tableau_projects_tidied %>% 
   filter(Funder == "Foreign, Commonwealth and Development Office",
-         status == "Active") %>% 
-  select(id, amount) %>% 
-  unique()
+        extending_org %in% c(
+                  "Arts and Humanities Research Council (AHRC)",
+                  "Biotechnology and Biological Sciences Research Council (BBSRC)",
+                  "Engineering and Physical Sciences Research Council (EPSRC)",
+                  "Economic and Social Research Council (ESRC)",
+                  "Medical Research Council (MRC)",
+                  "Natural Environment Research Council (NERC)",
+                  "Science and Technology Facilities Council (STFC)",
+                  "Innovate UK"
+                )) %>% 
+    select(id, amount) %>% 
+    unique()
 
 # Sum total award amounts
 sum(ukri_fcdo$amount, na.rm = TRUE)
 
 
 ### 3) UKRI - DHSC ---
-ukri_dhsc <- ukri_projects_final %>% 
-  filter(Funder == "Department of Health and Social Care",
-         status == "Active") %>% 
-  select(id, amount) %>% 
-  unique()
+ukri_dhsc <- tableau_projects_tidied %>% 
+           filter(Funder == "Department of Health and Social Care",
+                  extending_org %in% c(
+                    "Arts and Humanities Research Council (AHRC)",
+                    "Biotechnology and Biological Sciences Research Council (BBSRC)",
+                    "Engineering and Physical Sciences Research Council (EPSRC)",
+                    "Economic and Social Research Council (ESRC)",
+                    "Medical Research Council (MRC)",
+                    "Natural Environment Research Council (NERC)",
+                    "Science and Technology Facilities Council (STFC)",
+                    "Innovate UK"
+                  )) %>% 
+           select(id, amount) %>% 
+           unique()
 
 # Sum total award amounts
 sum(ukri_dhsc$amount, na.rm = TRUE)
@@ -37,20 +68,31 @@ sum(ukri_dhsc$amount, na.rm = TRUE)
 
 ### 3) FCDO Research & Evidence Division (non-UKRI, Wellcome)
 
-fcdo_non_ukri <- all_projects_tidied %>% 
+fcdo_non_ukri_wellcome <- tableau_projects_tidied %>% 
   filter(Funder == "Foreign, Commonwealth and Development Office",
-         !(extending_org %in% c("AHRC", "BBSRC", "EPSRC", "ESRC", "Innovate UK", "MRC", "NERC", "STFC")), 
-         currency == "GBP"
+         !(extending_org %in% c(
+           "Arts and Humanities Research Council (AHRC)",
+           "Biotechnology and Biological Sciences Research Council (BBSRC)",
+           "Engineering and Physical Sciences Research Council (EPSRC)",
+           "Economic and Social Research Council (ESRC)",
+           "Medical Research Council (MRC)",
+           "Natural Environment Research Council (NERC)",
+           "Science and Technology Facilities Council (STFC)",
+           "Innovate UK",
+           "Wellcome Trust"
+         )), currency == "GBP"
          ) %>% 
   select(id, amount) %>% 
   unique()
 
-sum(fcdo_non_ukri$amount, na.rm = TRUE)
+sum(fcdo_non_ukri_wellcome$amount, na.rm = TRUE)
 
 
 ### 4) NIHR GHR Programmes ---
-nihr_active <- nihr_projects_final %>% 
-  filter(status == "Active")
+nihr_active <- tableau_projects_tidied %>% 
+  filter(Fund == "Global Health Research - Programmes") %>% 
+  select(id, amount) %>% 
+  unique()
 
 sum(nihr_active$amount)
 
@@ -65,9 +107,8 @@ sum(nihr_active$amount)
 
 ### DHSC GAMRIF and UK Vaccine Network
 
-ghs_awards <- all_projects_tidied %>% 
-  filter(Fund %in% c("Global Health Security - UK Vaccine Network", "Global Health Security - GAMRIF"),
-         status == "Active") %>% 
+ghs_awards <- tableau_projects_tidied %>% 
+  filter(Fund %in% c("Global Health Security - UK Vaccine Network", "Global Health Security - GAMRIF")) %>% 
   select(id, amount) %>% 
   unique()
 
@@ -76,7 +117,7 @@ sum(ghs_awards$amount, na.rm = TRUE)
 
 ### Wellcome
 
-wellcome_grant_sum <- all_projects_tidied %>% 
+wellcome_grant_sum <- tableau_projects_tidied %>% 
   filter(str_detect(extending_org, "Wellcome"),
          amount > 0) %>% 
   select(id, amount) %>% 
@@ -88,47 +129,43 @@ sum(wellcome_grant_sum$amount, na.rm = TRUE)
 ### UK Space Agency
 
 # Check a delivery partner
-test <- all_projects_tidied %>% 
-  filter(extending_org == "UK Space Agency",
-         status == "Active") %>% 
+uksa <- tableau_projects_tidied %>% 
+  filter(extending_org == "UK Space Agency") %>% 
   select(id, amount) %>% 
   unique()
 
-sum(test$amount, na.rm = TRUE)
+sum(uksa$amount, na.rm = TRUE)
 
 
 ### Met Office
 
-test <- all_projects_tidied %>% 
-  filter(extending_org == "Met Office",
-         status == "Active") %>% 
+mo <- tableau_projects_tidied %>% 
+  filter(extending_org == "Met Office") %>% 
   select(id, amount) %>% 
   unique()
 
-sum(test$amount, na.rm = TRUE)
+sum(mo$amount, na.rm = TRUE)
 
 
 ### British Council
 
-test <- all_projects_tidied %>% 
+bc <- tableau_projects_tidied %>% 
   filter(Funder == "Department for Business, Energy and Industrial Strategy",
-         extending_org == "British Council",
-         status == "Active") %>% 
+         extending_org == "British Council") %>% 
   select(id, amount) %>% 
   unique()
 
-sum(test$amount, na.rm = TRUE)
+sum(bc$amount, na.rm = TRUE)
 
 
 ### Academies
 
-test <- all_projects_tidied %>% 
+academies <- tableau_projects_tidied %>% 
   filter(Funder == "Department for Business, Energy and Industrial Strategy",
-         extending_org %in% c("Royal Society", "Royal Academy of Engineering", "Academy of Medical Sciences", "British Academy"),
-         status == "Active") %>% 
+         extending_org %in% c("Royal Society", "Royal Academy of Engineering", "Academy of Medical Sciences", "British Academy")) %>% 
   select(id, amount) %>% 
   unique()
 
-sum(test$amount, na.rm = TRUE)
+sum(academies$amount, na.rm = TRUE)
 
 

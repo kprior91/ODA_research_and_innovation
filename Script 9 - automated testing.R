@@ -85,38 +85,25 @@ test_that("fund names are as expected", {
 })
 
 
-# Check how many UK gov funders are using the "RI" IATI tag
-
-ri_tag_users <- unique(ri_iati_activities$reporting_org.ref)
-print(ri_tag_users)
-
-
 # Check problematic IATI activity IDs 
 
-test_that("South Asia Research Country Fund data can be extracted", {
-  id <- "GB-1-205053"
-  data <- iati_activity_extract(id)
-  expect_true(length(data) > 0)
-})  # not working
-
-test_that("Evidence Fund data can be extracted", {
-  id <- "GB-GOV-1-300708"
-  data <- iati_activity_extract(id)
-  expect_true(length(data) > 0)
-})  # working
-
-test_that("LSE Int. Growth Centre data can be extracted", {
-  id <- "GB-COH-00070527-IGC-P3"
-  data <- iati_activity_extract(id)
-  expect_true(length(data) > 0)
-})  # not working
-
-test_that("IDS example data can be extracted", {
+test_that("IDS COVID Collective data can be extracted", {
   id <- "GB-COH-877338-GV-GOV-1-300708-124" 
   data <- iati_activity_extract(id)
   expect_true(length(data) > 0)
 })  # not working
 
+test_that("Manchester participating orgs", {
+  id <- "GB-COH-RC000797-GB-GOV-1-300180" 
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # not working
+
+test_that("Missing IDRC implementing org", {
+  id <- "XM-DAC-301-2-108111-001" 
+  data <- iati_activity_extract(id)
+  expect_true(length(data) > 0)
+})  # not working
 
 # Check IATI activities with multiple "General" descriptions
 

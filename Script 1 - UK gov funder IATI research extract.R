@@ -73,7 +73,7 @@ uk_gov_ri_programmes <- uk_gov_list_final %>%
 # Save list of tagged research & innovation activities
 ri_iati_activities <- uk_gov_ri_programmes %>% 
   filter(code == "RI") %>% 
-  select(iati_identifier, reporting_org.ref) %>% 
+  select(iati_identifier) %>% 
   unique() %>% 
   mutate(tag = "RI")
 
@@ -161,6 +161,7 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
   unique()
 
     # Add country locations based on IATI org references or lookup
+    # (takes ~5 mins to run)
     gov_list_unnest_4 <- gov_list_unnest_4 %>%
          # Extract 2 digit country code from org references (where populated)
       mutate(country_code = if_else((!is.na(ref) & substr(ref,3,3) == "-" & !(substr(ref,1,2) %in% c("XI", "XM"))), 

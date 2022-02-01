@@ -107,9 +107,8 @@ org_code <- c(
                            str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(text, "Health") ~ "Global Health Security - GAMRIF",
                            # Other DHSC partnerships
                            str_detect(text, "Health") ~ "Global Health Research - Partnerships",
-                           # FCDO AgResults
-                           str_detect(iati_identifier, "XI-IATI-AGR") ~ "FCDO Research - Partnerships",
-                           TRUE ~ "FCDO Research - Programmes"
+                           # FCDO funding
+                           TRUE ~ "FCDO Research - Partnerships"
                            )) %>%
           select(iati_identifier, activity_id, gov_funder, fund, text) %>%
           unique()
@@ -191,74 +190,7 @@ activity_list_unnest_2 <- partner_activity_comb %>%
   unique() %>% 
   summarise(country_name = paste(coalesce(country.name, ""), collapse = ", "))
 
-  # Identify activities without recipient countries at activity level
-  no_country_info <- partner_activity_comb %>% 
-    filter(lengths(recipient_country) == 0)
   
-     # Prepare results data frame and counters
-      transaction_list <- data.frame()
-  
-     # Run extraction, stopping when no new transactions are returned
-      for (id in no_country_info$iati_identifier) {
-        new_rows <- 0
-        page <- 1
-        
-        while (page == 1 | new_rows > 0) {
-          print(paste0(id, "-", page))
-          x <- nrow(transaction_list)
-          transaction_list <- transactions_extract(id, page, transaction_list)
-          page <- page + 1
-          y <- nrow(transaction_list)
-          new_rows = y - x
-        }
-      }
-      
-      # Subset fields
-      transaction_list_filtered <- transaction_list %>% 
-        unnest(cols = description.narrative,
-               keep_empty = TRUE) %>% 
-        select(iati_identifier, transaction_date, transaction_description = text,
-               currency.code, value, receiver_organisation.ref, receiver_organisation.narrative,
-               recipient_countries)
-      
-      # Unnest country information -----
-      transactions_by_country <- transaction_list_filtered %>% 
-          # unnest countries
-        filter(lengths(recipient_countries) != 0) %>% 
-        unnest(cols = recipient_countries) %>%
-        select(-country.url, -country.code) %>% 
-        rename(recipient_country = country.name) %>% 
-        filter(!is.na(recipient_country)) %>% 
-        unique()
-      
-      # Unnest receiver organisation info (where populated)
-      transactions_by_country_and_org <- transactions_by_country %>% 
-          # unnest orgs
-        filter(lengths(receiver_organisation.narrative) != 0) %>% 
-        unnest(cols = receiver_organisation.narrative) %>% 
-        select(-lang.code, -lang.name) %>% 
-        unique()
-        
-        # Save dataset to file (this is not currently used, but is a rich information
-        # source for sub-project detail)
-        saveRDS(transactions_by_country_and_org, "Outputs/transactions_by_country_and_org.rds")
-  
-      # Summarise countries for joining to main dataset
-      transactions_by_country <- transactions_by_country %>% 
-        select(iati_identifier, recipient_country) %>% 
-        unique() %>% 
-        group_by(iati_identifier) %>% 
-        summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
-      
-# Join on transactions country info to rest of dataset
-activity_list_unnest_2 <- partner_activity_comb %>% 
-    select(iati_identifier) %>% 
-    left_join(activity_list_unnest_2, by = "iati_identifier") %>% 
-    left_join(transactions_by_country, by = "iati_identifier") %>% 
-    mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
-    select(-country_name)
-  
-
 # 3) Unlist sectors
 activity_list_unnest_3 <- partner_activity_comb %>% 
   filter(lengths(sector) != 0) %>% 
@@ -280,9 +212,21 @@ activity_list_unnest_4 <- partner_activity_comb %>%
   filter(lengths(narrative) != 0,
          role.name == "Implementing") %>% 
   unnest(cols = narrative) %>% 
-  filter(lang.name == "English") %>% 
+  group_by(iati_identifier, role.name, ref) %>%
+  slice(1) %>% 
+  ungroup() %>% 
   select(-lang.code, -lang.name) %>% 
   unique()
+
+  # Identify activities with no implementing partner info
+    no_partner_info <- activity_list_unnest_4 %>% 
+      select(iati_identifier) %>% 
+      mutate(has_implementing_partner_info = "Yes") %>% 
+      unique() %>% 
+      right_join(partner_activity_comb, by = "iati_identifier") %>% 
+      filter(is.na(has_implementing_partner_info)) %>% 
+      select(iati_identifier) %>% 
+      unique()
 
   # Add country locations based on IATI references or lookup
     activity_list_unnest_4 <- activity_list_unnest_4 %>%
@@ -412,6 +356,108 @@ activity_list_unnest_7 <- partner_activity_comb %>%
   select(iati_identifier, start_date, end_date)
 
 
+# 8) Extract transactions
+
+# Prepare results data frame and counters
+transaction_list <- data.frame()
+
+# Run extraction, stopping when no new transactions are returned
+# (takes ~5 mins)
+for (id in partner_activity_comb$iati_identifier) {
+  new_rows <- 0
+  page <- 1
+  
+  while (page == 1 | new_rows > 0) {
+    print(paste0(id, "-", page))
+    x <- nrow(transaction_list)
+    transaction_list <- transactions_extract(id, page, transaction_list)
+    page <- page + 1
+    y <- nrow(transaction_list)
+    new_rows = y - x
+  }
+}
+
+# Save to Rdata file
+saveRDS(transaction_list, file = "Outputs/transaction_list.rds")
+# transaction_list <- readRDS(file = "Outputs/transaction_list.rds")
+
+
+    # Extract recipient countries (where included in transactions)
+        transaction_countries <- transaction_list %>% 
+          select(iati_identifier, recipient_countries) %>% 
+          unique() %>% 
+            # unnest countries
+          filter(lengths(recipient_countries) != 0) %>% 
+          unnest(cols = recipient_countries) %>%
+          select(-country.url, -country.code) %>% 
+            # rename and remove blanks
+          rename(recipient_country = country.name) %>% 
+          filter(!is.na(recipient_country)) %>% 
+          unique()
+        
+        # Summarise countries for joining to main dataset
+        transaction_countries_summarised <- transaction_countries %>% 
+          group_by(iati_identifier) %>% 
+          summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
+        
+
+    # Extract receiver organisations
+        transaction_receiver_orgs <- transaction_list %>% 
+          select(iati_identifier, receiver_organisation.narrative) %>% 
+          unique() %>% 
+            # unnest organisation names
+          filter(lengths(receiver_organisation.narrative) != 0) %>% 
+          unnest(cols = receiver_organisation.narrative) %>% 
+          select(-lang.code, -lang.name) %>% 
+          rename(transaction_receiver_name = text) %>% 
+            # Exclude blanks, other text
+          filter(!is.na(transaction_receiver_name), 
+                 !str_detect(str_to_lower(transaction_receiver_name), "reimbursement"),
+                 !str_detect(str_to_lower(transaction_receiver_name), "disbursement")) %>% 
+          unique()
+        
+        # Add to organisation name and country database
+        receiver_orgs_to_save <- transaction_receiver_orgs %>% 
+          inner_join(no_partner_info, by = "iati_identifier") %>% 
+          rename(project_id = iati_identifier,
+                 organisation_name = transaction_receiver_name) %>% 
+          # Look up country from both country code and organisation name
+          mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
+          mutate(organisation_country = unlist(organisation_country)) %>% 
+          mutate(organisation_role = 2) # partners
+          
+          # Add on to org file to save
+          org_names_and_locations_1 <- org_names_and_locations_1 %>% 
+          rbind(receiver_orgs_to_save)      
+        
+        
+        # Summarise orgs for joining to main dataset
+        transaction_orgs_summarised <- transaction_receiver_orgs %>% 
+          group_by(iati_identifier) %>% 
+          summarise(transaction_receiver_name = paste(coalesce(transaction_receiver_name, ""), collapse = ", "))
+
+        
+    # Extract sum of outgoing transaction amounts (to use if no budgets present)
+        
+        
+        
+        
+      # Join on transactions country and org info to relevant datasets
+        activity_list_unnest_2 <- partner_activity_comb %>% 
+          select(iati_identifier) %>% 
+          left_join(activity_list_unnest_2, by = "iati_identifier") %>% 
+          left_join(transaction_countries_summarised, by = "iati_identifier") %>% 
+          mutate(recipient_country = coalesce(recipient_country, country_name)) %>% 
+          select(-country_name)
+        
+        activity_list_unnest_4 <- partner_activity_comb %>% 
+          select(iati_identifier) %>% 
+          left_join(activity_list_unnest_4, by = "iati_identifier") %>%
+          left_join(transaction_orgs_summarised, by = "iati_identifier") %>% 
+          mutate(partner = coalesce(partner, transaction_receiver_name)) %>% 
+          select(-transaction_receiver_name)
+          
+
 # Join unnested info to original data
 activity_list <- activity_list_base %>% 
   left_join(activity_list_unnest_1, by = "iati_identifier") %>%
@@ -449,8 +495,8 @@ activity_list <- activity_list %>%
 
 # Add missing FCDO activity IDs
 activity_list <- activity_list %>% 
-  mutate(programme_id = case_when(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_title, "CLARE") ~ "GB-GOV-1-300126",
-                                  str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_title, "CARIAA") ~ "GB-1-203506", 
+  mutate(programme_id = case_when(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CLARE") ~ "GB-GOV-1-300126",
+                                  str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CARIAA") ~ "GB-1-203506", 
                                   str_detect(iati_identifier, "XI-IATI-AGR") ~ "GB-1-203052",
                                   TRUE ~ programme_id))
 

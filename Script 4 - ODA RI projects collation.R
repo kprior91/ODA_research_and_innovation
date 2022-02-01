@@ -17,13 +17,13 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.r
 # Read in list of IATI activities (from UK gov funders and select delivery partners)
 iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
-fcdo_non_iati_ids <- paste0(fcdo_non_iati_programmes$iati_identifier, collapse = "|")
+gov_non_iati_ids <- paste0(gov_non_iati_programmes$iati_identifier, collapse = "|")
 
 # Filter gov department records for project-level activities
 iati_projects <- iati_activity_list %>%
-  filter(str_detect(iati_identifier, "GB-GOV-3|GB-GOV-7") |   # keep ex-FCO and Defra activities
-         str_detect(iati_identifier, fcdo_non_iati_ids)       # keep FCDO programmes/components out of scope of IATI 
-  ) %>%    
+  filter(str_detect(iati_identifier, "GB-GOV-3|GB-GOV-7") |     # include ex-FCO and Defra activities
+         str_detect(iati_identifier, gov_non_iati_ids)         # keep FCDO/DHSC programmes funding out of scope of IATI 
+         ) %>%    
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
   plyr::rbind.fill(partner_iati_list) # Add partner activities
 
@@ -232,7 +232,7 @@ saveRDS(ukri_projects_with_countries, file = "Outputs/ukri_projects_with_countri
 # Clear environment
 rm(data, n, id, missing_awards, ukri_projects_by_fund,
    ukri_projects_by_id, ukri_projects_by_id_with_id,
-   ukri_projects_ids_full,
+   ukri_projects_ids_full, ukri_projects_final,
    ukri_ooda_projects_ids, ukri_iati_projects)
 
 
@@ -603,51 +603,19 @@ saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3.rds
 rm(roda_extract_gcrf, roda_extract_newton)
 
 
-# 7) FCDO problematic IATI activities
-
-extra_fcdo_projects <- fcdo_problematic_iati_activities %>% 
-  rename(id = `Extending organisation - award ID`,
-         title = `Award title`,
-         abstract = `Award description`,
-         start_date = `Start date`,
-         end_date = `End date`,
-         amount = `Award amount (£)`,
-         recipient_country = `Beneficiary country`,
-         extending_org = `Extending organisation - name`,
-         lead_org_name = `Lead organisation - name`,
-         lead_org_country = `Lead organisation - country`,
-         partner_org_name = `Implementing partner(s) - name`,
-         partner_org_country = `Implementing partner(s) - country`,
-         iati_id = `Funder programme - IATI ID`,
-         link = `Data source`
-  ) %>% 
-  mutate(start_date = as.character(start_date),
-         end_date = as.character(end_date),
-         currency = coalesce(Currency, "GBP"),
-         period_start = NA_character_,
-         period_end = NA_character_,
-         subject = NA_character_,
-         status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
-         last_updated = quarter_end_date
-  ) %>% 
-  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`)
-
-
-
-# 8) Join funder datasets together ----------------------------------------------
+# 7) Join funder datasets together ----------------------------------------------
 
 all_projects <- rbind(ukri_projects_with_countries, 
                       nihr_projects_final, 
                       iati_projects_final, 
                       wellcome_grants_final,
                       dhsc_ghs_projects_final,
-                      roda_extract_gcrf_final, roda_extract_newton_final,
-                      extra_fcdo_projects) %>% 
+                      roda_extract_gcrf_final, roda_extract_newton_final) %>% 
   unique() %>% 
   ungroup()
 
 
-# 9) Manual exclusions and formatting -------------------------------------------
+# 8) Manual exclusions and formatting -------------------------------------------
 
 # Manually edit country info for Chevening Scholarships
 all_projects_tidied <- all_projects %>% 
@@ -686,7 +654,7 @@ all_projects_tidied <- all_projects_tidied %>%
                         paste0("https://devtracker.fcdo.gov.uk/projects/", iati_id, "/summary"), link))
 
 
-# 10) Save datasets -------------------------------------------
+# 9) Save datasets -------------------------------------------
 
 saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied.rds")
 # all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds") 
@@ -703,7 +671,12 @@ saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations.rds")
 
 # Clear environment
 rm(org_names_and_locations_1, org_names_and_locations_2, org_names_and_locations_3, 
-   org_names_and_locations)
+   org_names_and_locations, ukri_projects_with_countries, 
+   nihr_projects_final, 
+   iati_projects_final, 
+   wellcome_grants_final,
+   dhsc_ghs_projects_final,
+   roda_extract_gcrf_final, roda_extract_newton_final)
 
 
 
