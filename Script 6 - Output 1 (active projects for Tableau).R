@@ -29,54 +29,39 @@ tableau_projects <- tableau_projects %>%
 
 # 3) Add funder programme names ------------------
 
-# Add FCDO programme ID to dataset
-tableau_projects_tidied <- tableau_projects %>% 
-    # remove any text before "-1-" in the FCDO IATI ID
-  mutate(fcdo_programme_id = if_else((Funder == "Foreign, Commonwealth and Development Office"
-                                     & str_detect(iati_id, "-1-")),
-                                     sub(".*-1-", "", iati_id), "")) %>% 
-    # remove any FCDO component numbers
-  mutate(fcdo_programme_id = sub("-.*", "", fcdo_programme_id))
+# Add FCDO/DHSC programme names to dataset
 
-# Add FCDO programme name to dataset
+    # Create vector of gov funder programme IATI IDs
+    # (takes too long to run - 10+ mins)
+    gov_funder_iati_ids <- tableau_projects %>% 
+      select(Funder, iati_id) %>% 
+      filter(str_detect(iati_id, "GB-1-|GB-GOV-1-|GB-GOV-10-")) %>% # filter FCDO and DHSC IDs only
+        # remove any FCDO component numbers
+        mutate(programme_iati_id = if_else(Funder == "Foreign, Commonwealth and Development Office" &
+                                   substr(iati_id, nchar(iati_id)-3, nchar(iati_id)-3) == "-",
+                                   substr(iati_id, 1, nchar(iati_id)-4), iati_id)) %>% 
+        # Add programme names on
+        mutate(funder_programme = map(programme_iati_id, extract_iati_activity_name)) %>% 
+        mutate(funder_programme = unlist(funder_programme)) %>% 
+       select(-Funder, -programme_iati_id) %>% 
+       unique()
 
-    # Create vector of FCDO gov funder programme IATI IDs
-    gov_funder_iati_ids <- tableau_projects_tidied %>% 
-      select(iati_id) %>% 
-      filter(str_detect(iati_id, "GB-1-|GB-GOV-1-")) %>% 
-      unique()
-    
-    # Create empty dataframe to hold name extract from IATI
-    gov_funder_programme_names <- data.frame()
-    
-    # Run function over all IATI ids
-    for (id in gov_funder_iati_ids$iati_id) {
-      print(id)
-      data <- extract_iati_activity_name(id)
-      gov_funder_programme_names <- rbind(gov_funder_programme_names, data)
-    }
-
+  
 # Join funder programme name to main dataset
-tableau_projects_tidied <- tableau_projects_tidied %>%
-      left_join(gov_funder_programme_names, by = c("iati_id" = "funder_iati_id")) %>% 
+tableau_projects_tidied <- tableau_projects %>%
+      left_join(gov_funder_iati_ids, by = "iati_id") %>% 
       mutate(funder_programme = if_else(extending_org == "Wellcome Trust", subject, funder_programme))
 
 
 # 4) Apply manual exclusions/rules ----------------------------
 
 # TEMPORARY ***
-# Remove IDRC DHSC IATI data (this has been provided by spreadsheet)
+# Remove IDRC DHSC IATI data (this has been provided instead by spreadsheet)
 tableau_projects_tidied <- tableau_projects_tidied %>% 
   filter(!(Funder == "Department of Health and Social Care" & 
            extending_org == "International Development Research Centre" &
            is.na(amount))
          )
-
-# TEMPORARY
-# Remove Afghanistan projects (added Sep 21)
-tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(Country != "Afghanistan")
-
 
 # 5) Write data --------------------------------
 

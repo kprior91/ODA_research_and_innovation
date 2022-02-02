@@ -22,10 +22,13 @@
 ## Colombia
 # country_list <- c("Colombia")
 
+# West and South Africa
+country_list <- c("Nigeria","South Africa","Ghana","Madagascar","Mozambique","Sierra Leone","Botswana",
+                  "Senegal","Malawi", "Ivory Coast", "Zimbabwe", "Zambia")
 
 # Define strings for use in output file name
-string <- "Colombia"
-date <- "Jan22"
+string <- "South & West Africa"
+date <- "Feb22"
 
 # Read in datasets
 tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 

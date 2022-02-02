@@ -11,11 +11,11 @@ org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
 # Connect to ODA RI Projects database on development server
 # (need to be connected to DFID VPN)
 
-con_live <- DBI::dbConnect(odbc::odbc(),
-                            Driver = "SQL Server", 
-                            Server   = "hel-sql-120",
-                            Database = "ODARIProjects",
-                            Trusted_Connection = "True")
+# con_live <- DBI::dbConnect(odbc::odbc(),
+#                             Driver = "SQL Server", 
+#                             Server   = "hel-sql-120",
+#                             Database = "ODARIProjects",
+#                             Trusted_Connection = "True")
   
 
 # 1) Create master project table ----

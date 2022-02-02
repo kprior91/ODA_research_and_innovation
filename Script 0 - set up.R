@@ -249,7 +249,7 @@ transactions_extract <- function(activity_id, page, output_data) {
 }
 
 
-# Function to extract programme names from IATI
+# Function to extract activity names from an IATI activity ID
 
 extract_iati_activity_name <- function(activity_id) {
   
@@ -266,11 +266,14 @@ extract_iati_activity_name <- function(activity_id) {
     new_data <- new_data %>% 
       unnest(col = title.narrative) %>% 
       select(funder_iati_id = iati_identifier, funder_programme = text)
+    
+    result <- new_data$funder_programme
+    
   } else {
-    new_data <- data.frame()
+    result <- NA_character_
   }
   
-  return(new_data)
+  return(result)
   
 }
 

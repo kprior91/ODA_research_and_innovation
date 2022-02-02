@@ -15,12 +15,12 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.r
 # 1) Extract IATI projects ------------------------------------------------
 
 # Read in list of IATI activities (from UK gov funders and select delivery partners)
-iati_activity_list <- readRDS(file = "Outputs/gov_list_final.rds")
+gov_iati_list <- readRDS(file = "Outputs/gov_list_final.rds")
 partner_iati_list <- readRDS(file = "Outputs/partner_activity_list.rds")
 gov_non_iati_ids <- paste0(gov_non_iati_programmes$iati_identifier, collapse = "|")
 
 # Filter gov department records for project-level activities
-iati_projects <- iati_activity_list %>%
+iati_projects <- gov_iati_list %>%
   filter(str_detect(iati_identifier, "GB-GOV-3|GB-GOV-7") |     # include ex-FCO and Defra activities
          str_detect(iati_identifier, gov_non_iati_ids)         # keep FCDO/DHSC programmes funding out of scope of IATI 
          ) %>%    
@@ -28,7 +28,7 @@ iati_projects <- iati_activity_list %>%
   plyr::rbind.fill(partner_iati_list) # Add partner activities
 
 # Identify UKRI projects (by "RI" IATI tag)
-ukri_iati_projects <- iati_activity_list %>% 
+ukri_iati_projects <- gov_iati_list %>% 
   filter(extending_org == "UK Research & Innovation") %>% 
   mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>% 
   mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>% 
@@ -38,9 +38,13 @@ ukri_iati_projects <- iati_activity_list %>%
 
 # Add on beneficiary countries for FCDO non-IATI programmes
 iati_projects <- iati_projects %>% 
-  left_join(fcdo_non_iati_programmes, by = "iati_identifier") %>% 
+  # remove any FCDO component numbers
+  mutate(programme_iati_id = if_else(reporting_org_ref == "GB-GOV-1" &
+                                      substr(iati_identifier, nchar(iati_identifier)-3, nchar(iati_identifier)-3) == "-",
+                                     substr(iati_identifier, 1, nchar(iati_identifier)-4), iati_identifier)) %>% 
+  left_join(gov_non_iati_programmes, by = c("programme_iati_id" = "iati_identifier")) %>% 
   mutate(recipient_country = coalesce(recipient_country, str_to_title(fcdo_geocoding_countries))) %>% 
-  select(-programme_name, -fcdo_geocoding_countries)
+  select(-programme_name, -fcdo_geocoding_countries, -programme_iati_id)
 
 
 # Keep required fields
@@ -83,7 +87,7 @@ iati_projects_final <- iati_projects_final %>%
   mutate(link = paste0("https://d-portal.org/ctrack.html#view=act&aid=", id))
 
 # Clear environment
-rm(iati_activity_list, partner_iati_list, iati_projects)
+rm(gov_iati_list, partner_iati_list, iati_projects)
 
 
 # 2) Extract UKRI projects -------------------------------------------
@@ -358,7 +362,7 @@ saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final.rds")
 
 # Clear environment
 rm(paths, i, nihr_data, nihr_projects, nihr_partners, nihr_partners_comb,
-   nihr_partners_names, nihr_partners_countries, nihr_country_projects,
+   nihr_partners_names, nihr_partners_countries,
    request, response)
 
 
