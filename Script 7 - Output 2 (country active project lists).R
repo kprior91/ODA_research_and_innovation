@@ -20,14 +20,14 @@
 # country_list <- c("India", "Nepal", "Bangladesh", "Bhutan", "Sri Lanka", "Maldives")
 
 ## Colombia
-# country_list <- c("Colombia")
+# country_list <- c("Ukraine")
 
 # West and South Africa
 country_list <- c("Nigeria","South Africa","Ghana","Madagascar","Mozambique","Sierra Leone","Botswana",
                   "Senegal","Malawi", "Ivory Coast", "Zimbabwe", "Zambia")
 
 # Define strings for use in output file name
-string <- "South & West Africa"
+string <- "Ukraine"
 date <- "Feb22"
 
 # Read in datasets

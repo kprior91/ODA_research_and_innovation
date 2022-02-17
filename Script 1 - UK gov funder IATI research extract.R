@@ -329,21 +329,21 @@ gov_list_final <- gov_list %>%
             reporting_org_ref %in% c("GB-GOV-7", "GB-GOV-12", "GB-GOV-13", "GB-GOV-50")) # Defra, DCMS, BEIS, Prosperity Fund - keep parent activities
 
 
-# # Join on FCDO parent (programme) descriptions to child (component) activities
-# gov_list_final <- gov_list_final %>%
-#      # Extract FCDO programme activity ID
-#   mutate(programme_id = if_else(hierarchy == 2 & reporting_org_ref == "GB-GOV-1",
-#                                 substr(iati_identifier, 1, nchar(iati_identifier)-4), NA_character_)) %>%
-#      # Join on programme title
-#   left_join(select(gov_list_unnest_1,
-#                    iati_identifier,
-#                    programme_title = activity_title,
-#                    programme_description = activity_description),
-#             by = c("programme_id" = "iati_identifier")) %>%
-#   mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
-#                                         programme_description,
-#                                         activity_description))
-#   
+# Join on FCDO parent (programme) descriptions to child (component) activities
+gov_list_final <- gov_list_final %>%
+     # Extract FCDO programme activity ID
+  mutate(programme_id = if_else(hierarchy == 2 & reporting_org_ref == "GB-GOV-1",
+                                substr(iati_identifier, 1, nchar(iati_identifier)-4), NA_character_)) %>%
+     # Join on programme title
+  left_join(select(gov_list_unnest_1,
+                   iati_identifier,
+                   programme_title = activity_title,
+                   programme_description = activity_description),
+            by = c("programme_id" = "iati_identifier")) %>%
+  mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
+                                        programme_description,
+                                        activity_description))
+
 
 
 # 6) Save to Rdata file ----
