@@ -31,7 +31,7 @@ for (id in ri_iati_activities$iati_identifier) {
   
   if (length(new_data) > 0) {
     new_data <- new_data %>% 
-      mutate(funding_iati_id = id) %>% 
+      mutate(activity_id = id) %>% 
       unique()
   }
   
@@ -48,9 +48,9 @@ for (id in ri_iati_activities$iati_identifier) {
 # 3) Keep partner activity IDs only (not duplicate gov funder ones) ----
 
 ri_linked_activites <- transactions_dataset %>% 
-  filter(iati_identifier != funding_iati_id) %>% 
-  select(funding_iati_id,
-         iati_id = iati_identifier) %>% 
+  filter(iati_identifier != activity_id) %>% 
+  select(activity_id,
+         iati_identifier) %>% 
   unique()
 
 

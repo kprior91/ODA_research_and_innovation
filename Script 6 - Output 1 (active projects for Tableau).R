@@ -32,7 +32,7 @@ tableau_projects <- tableau_projects %>%
 # Add FCDO/DHSC programme names to dataset
 
     # Create vector of gov funder programme IATI IDs
-    # (takes too long to run - 10+ mins)
+    # (takes 10-15 mins to run)
     gov_funder_iati_ids <- tableau_projects %>% 
       select(Funder, iati_id) %>% 
       filter(str_detect(iati_id, "GB-1-|GB-GOV-1-|GB-GOV-10-")) %>% # filter FCDO and DHSC IDs only
@@ -69,6 +69,19 @@ tableau_projects_tidied <- tableau_projects_tidied %>%
 tableau_projects_tidied <- tableau_projects_tidied %>% 
   filter(status %in% c("Active", "Unknown")) %>% 
   unique()
+
+tableau_projects_tidied <- tableau_projects_tidied %>% 
+  mutate(Fund = case_when(
+    Fund == "Global Challenges Research Fund (GCRF)" ~ "BEIS - Global Challenges Research Fund (GCRF)",
+    Fund == "Newton Fund" ~ "BEIS - Newton Fund",
+    Fund == "Chevening Scholarships" ~ "FCDO - Chevening Scholarships",
+    Fund == "Global Health Research - Partnerships" ~ "DHSC - Global Health Research - Partnerships",
+    Fund == "Global Health Research - Programmes" ~ "DHSC - Global Health Research - Programmes",
+    Fund == "Global Health Security - GAMRIF" ~ "DHSC - Global Health Security - GAMRIF",
+    Fund == "Global Health Security - UK Vaccine Network" ~ "DHSC - Global Health Security - UK Vaccine Network",
+    Fund == "International Climate Finance (ICF)" ~ "BEIS - International Climate Finance (ICF)",        
+    TRUE ~ Fund
+  ))
 
 # Write to RDS 
 saveRDS(tableau_projects_tidied, "Outputs/tableau_projects_tidied.rds")

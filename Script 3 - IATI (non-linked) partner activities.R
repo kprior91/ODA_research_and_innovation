@@ -23,11 +23,16 @@ partner_iati_activity_ids <- unlinked_partner_iati_activity_ids %>%
           partner_activity_extract <- rbind(partner_activity_extract, result)
 
       }
-
+      
 # Save to Rdata file
 saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract.rds")
 # partner_activity_extract <- readRDS(file = "Outputs/partner_activity_extract.rds")
 
+# Join on funder and fund information
+partner_activity_extract <- partner_activity_extract %>%       
+      left_join(partner_iati_activity_ids, by = "iati_identifier") %>% 
+      select(-extending_org)
+      
 
 ### 2) Activity extract for specific partnership organisations ----
 
@@ -36,8 +41,6 @@ saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract.rds")
 org_code <- c(
               "XM-DAC-47015", # CGIAR
               "XM-DAC-301-2", # IDRC
-              "XI-IATI-CABI", # CABI
-              "XM-DAC-928",   # WHO
               "DAC-1601",     # Bill & Melinda Gates Foundation
               "XI-IATI-AGR"   # AgResults (Consortium)
               )   
@@ -47,7 +50,7 @@ org_code <- c(
         # Prepare results data frame and counters
         org_activity_list <- data.frame()
 
-        # Run extraction
+        # Run extraction (takes few hours to run)
         for (org in org_code) {
           new_rows <- 0
           page <- 1
@@ -76,18 +79,23 @@ org_code <- c(
           filter(str_detect(text, "FCDO|DFID")) %>%
           mutate(gov_funder = "Foreign, Commonwealth and Development Office",
                  fund = "FCDO Research - Partnerships") %>%
-          select(iati_identifier, gov_funder, fund, text) %>%
+          select(iati_identifier, gov_funder, fund) %>%
           unique()
 
         # 2.B) Identify UK gov funded activities from participating organisations
 
         partner_activities_via_funder <- org_activity_list %>%
+          # unnest title
           unnest(cols = title.narrative) %>%
+          rename(title = text) %>% 
+          # unnest participating orgs
           filter(lengths(participating_org) != 0) %>%
           unnest(cols = participating_org) %>%
+          # unnest org names
           select(iati_identifier, role.name, narrative, ref, activity_id) %>%
           unnest(cols = narrative) %>%
           select(-lang.code, -lang.name) %>%
+          rename(org_name = text) %>% 
             # restrict to funding organisations and AgResults activities (pooled funding)
           filter(role.name %in% c("Funding") |
                    str_detect(iati_identifier, "XI-IATI-AGR")
@@ -95,32 +103,26 @@ org_code <- c(
           unique() %>%
             # restrict to UK gov funding
           filter(ref == "GB-GOV-1" |
-                   str_detect(text, "Britain|DFID|FCDO|DHSC|Department of Health and Social Care") |
+                   str_detect(org_name, "Britain|DFID|FCDO|DHSC|Department of Health and Social Care") |
                    str_detect(iati_identifier, "DFID") |
                    str_detect(iati_identifier, "XI-IATI-AGR")      # AgResults partially funded
                  ) %>%
             # define fund and funder
-          mutate(gov_funder = if_else(str_detect(text, "Health"), "Department of Health and Social Care",
+          mutate(gov_funder = if_else(str_detect(org_name, "Health"), "Department of Health and Social Care",
                                       "Foreign, Commonwealth and Development Office"),
                  fund = case_when(
                            # IDRC GAMRIF projects
-                           str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(text, "Health") ~ "Global Health Security - GAMRIF",
+                           str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(org_name, "Health") ~ "DHSC - Global Health Security - GAMRIF",
                            # Other DHSC partnerships
-                           str_detect(text, "Health") ~ "Global Health Research - Partnerships",
+                           str_detect(org_name, "Health") ~ "DHSC - Global Health Research - Partnerships",
                            # FCDO funding
                            TRUE ~ "FCDO Research - Partnerships"
                            )) %>%
-          select(iati_identifier, activity_id, gov_funder, fund, text) %>%
+          select(iati_identifier, gov_funder, fund) %>%
           unique()
 
         # Combine 2A and 2B
         partnership_activities <- plyr::rbind.fill(partner_activities_via_title, partner_activities_via_funder)
-
-        # Remove World Health Organisation non-research/innovation activities
-        partnership_activities <- partnership_activities %>% 
-          filter(!(str_detect(iati_identifier, "XM-DAC-928")) |
-                   str_detect(text, "research|innovation")) %>% 
-          select(-text)
         
         # Filter original data
         partnership_activities <- org_activity_list %>%
@@ -146,10 +148,6 @@ activity_list_base <- partner_activity_comb %>%
          activity_id,
          gov_funder,
          fund) %>% 
-    # Join on fund/funder information
-  left_join(select(partner_iati_activity_ids, iati_id, gov_funder), by = c("iati_identifier" = "iati_id")) %>% 
-  mutate(gov_funder = coalesce(gov_funder.x, gov_funder.y)) %>% 
-  select(-gov_funder.x, -gov_funder.y) %>% 
   unique()
 
 
@@ -229,6 +227,7 @@ activity_list_unnest_4 <- partner_activity_comb %>%
       unique()
 
   # Add country locations based on IATI references or lookup
+  # (takes ~10 mins to run)
     activity_list_unnest_4 <- activity_list_unnest_4 %>%
         # Extract 2 digit country code from org references (where populated)
       mutate(country_code = if_else((!is.na(ref) & substr(ref,3,3) == "-" & !(substr(ref,1,2) %in% c("XI", "XM"))), substr(ref,1,2), "")) %>% 
@@ -284,7 +283,7 @@ activity_list_unnest_5 <- partner_activity_comb %>%
   unique() %>% 
   ungroup()
 
-    # Lookup country
+    # Lookup country (takes ~10 mins to run)
     activity_list_unnest_5 <- activity_list_unnest_5 %>% 
         # Extract 2 digit country code from org references (where populated)
       mutate(country_code = if_else((!is.na(reporting_org_ref) & substr(reporting_org_ref,3,3) == "-" & !(substr(reporting_org_ref,1,2) %in% c("XI", "XM"))), 
@@ -435,11 +434,6 @@ saveRDS(transaction_list, file = "Outputs/transaction_list.rds")
         transaction_orgs_summarised <- transaction_receiver_orgs %>% 
           group_by(iati_identifier) %>% 
           summarise(transaction_receiver_name = paste(coalesce(transaction_receiver_name, ""), collapse = ", "))
-
-        
-    # Extract sum of outgoing transaction amounts (to use if no budgets present)
-        
-        
         
         
       # Join on transactions country and org info to relevant datasets
@@ -485,20 +479,23 @@ activity_list <- activity_list %>%
   unique() %>% 
   mutate(refresh_date = Sys.Date())
 
-# Add Fund label
-activity_list <- activity_list %>%  
-    left_join(select(partner_iati_activity_ids, gov_funder, iati_id, funding_iati_id), 
-              by = c("iati_identifier" = "iati_id", "gov_funder")) %>% 
-    mutate(programme_id = coalesce(funding_iati_id, activity_id)) %>% 
-    mutate(fund = coalesce(fund, "FCDO Research - Programmes"),
-           gov_funder = coalesce(gov_funder, "Foreign, Commonwealth and Development Office"))
 
-# Add missing FCDO activity IDs
-activity_list <- activity_list %>% 
-  mutate(programme_id = case_when(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CLARE") ~ "GB-GOV-1-300126",
-                                  str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CARIAA") ~ "GB-1-203506", 
-                                  str_detect(iati_identifier, "XI-IATI-AGR") ~ "GB-1-203052",
-                                  TRUE ~ programme_id))
+activity_list <- activity_list %>%  
+      # Add missing FCDO activity IDs (IDRC and AgResults)
+    rename(programme_id = activity_id) %>% 
+    mutate(programme_id = case_when(str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CLARE") ~ "GB-GOV-1-300126",
+                                    str_detect(iati_identifier, "XM-DAC-301-2") & str_detect(activity_description, "CARIAA") ~ "GB-1-203506", 
+                                    str_detect(iati_identifier, "XI-IATI-AGR") ~ "GB-1-203052",
+                                    TRUE ~ programme_id),  
+      # Add Fund and Funder label  
+           fund = case_when(
+                    str_detect(programme_id, "GB-GOV-1-|GB-1-") ~ "FCDO Research - Programmes",
+                    str_detect(programme_id, "GB-GOV-10") ~ "DHSC - Global Health Research - Partnerships",
+                    TRUE ~ fund),
+           gov_funder = case_when(
+             str_detect(programme_id, "GB-GOV-1-|GB-1-") ~ "Foreign, Commonwealth and Development Office",
+             str_detect(programme_id, "GB-GOV-10") ~ "Department of Health and Social Care",
+             TRUE ~ gov_funder))
 
 
 # Save to Rdata file

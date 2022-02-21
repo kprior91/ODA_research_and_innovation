@@ -97,8 +97,8 @@ rm(gov_iati_list, partner_iati_list, iati_projects)
 # Label GCRF and Newton projects from IATI UKRI data
 ukri_projects_by_fund <- ukri_iati_projects %>% 
   mutate(Fund = case_when(
-                   str_detect(iati_identifier, "GCRF") ~ "Global Challenges Research Fund (GCRF)",
-                   str_detect(iati_identifier, "Newton") ~ "Newton Fund",
+                   str_detect(iati_identifier, "GCRF") ~ "BEIS - Global Challenges Research Fund (GCRF)",
+                   str_detect(iati_identifier, "Newton") ~ "BEIS - Newton Fund",
                    TRUE ~ "Other"
                         ),
          Funder = "Department for Business, Energy and Industrial Strategy")
@@ -115,6 +115,7 @@ ukri_projects_by_id <- data.frame()
 org_names_and_locations_2 <- data.frame()
 
 # Run project info extraction over all GtR projects
+# (takes 1-2 hours to run)
 
 n <- 1 # set counter
 
@@ -175,8 +176,8 @@ ukri_projects_final <- ukri_projects_final %>%
          period_start = NA_character_,
          period_end = NA_character_,
          currency = "GBP",
-         Fund = if_else(Fund == "GCRF", "Global Challenges Research Fund (GCRF)",
-                        if_else(Fund == "Newton", "Newton Fund", Fund)),
+         Fund = if_else(Fund == "GCRF", "BEIS - Global Challenges Research Fund (GCRF)",
+                        if_else(Fund == "Newton", "BEIS - Newton Fund", Fund)),
          extending_org = case_when(
            extending_org == "AHRC" ~ "Arts and Humanities Research Council (AHRC)",
            extending_org == "BBSRC" ~ "Biotechnology and Biological Sciences Research Council (BBSRC)",
@@ -306,7 +307,7 @@ nihr_projects_final <- nihr_projects %>%
 nihr_projects_final <- nihr_projects_final %>% 
   mutate(id = project_id,
          Funder = "Department of Health and Social Care",
-         Fund = "Global Health Research - Programmes",
+         Fund = "DHSC - Global Health Research - Programmes",
          recipient_country = NA_character_,
          lead_org_country = ctrynm,
          iati_id = NA_character_,
@@ -382,7 +383,7 @@ wellcome_grants_formatted <- wellcome_grants %>%
          Funder = if_else(str_detect(`CoFunders`, "National Institute for Health Research"), 
                           "Department of Health and Social Care", `CoFunders`),
          Fund = if_else(Funder == "Department of Health and Social Care",
-                        "Global Health Research - Partnerships", "FCDO Research - Programmes"),
+                        "DHSC - Global Health Research - Partnerships", "FCDO Research - Programmes"),
          last_updated = quarter_end_date) %>% 
   filter(`ODA Funding` > 0)
 
@@ -524,11 +525,11 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          abstract = Description,
          title = Title,
          amount = Amount,
-         recipient_country = `Recipient country`,
+         recipient_country = `Benefitting country`,
          extending_org = `Delivery partner`,
          lead_org_name = `Lead Organisation`
   ) %>% 
-  mutate(Fund = "Global Challenges Research Fund (GCRF)",
+  mutate(Fund = "BEIS - Global Challenges Research Fund (GCRF)",
          Funder = "Department for Business, Energy and Industrial Strategy",
          start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
@@ -537,9 +538,9 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
          partner_org_country = NA_character_,
          iati_id = NA_character_,
          currency = "GBP",
-         status = if_else(`Activity status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
-                          if_else(`Activity status` %in% c("Completed"), "Closed", 
-                                  if_else(`Activity status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
+         status = if_else(`Activity Status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(`Activity Status` %in% c("Completed"), "Closed", 
+                                  if_else(`Activity Status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = NA_character_,
          period_end = NA_character_,
          subject = NA_character_,
@@ -550,8 +551,8 @@ roda_extract_gcrf_final <- roda_extract_gcrf %>%
     # suppress display of active project end dates that have passed
   mutate(end_date = if_else(status == "Active" & Sys.Date() <= end_date, end_date, NA_character_)) %>%
     # remove unecessary variables
-  select(-Level, -`Recipient region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
-         -`Actual end date`, -`Activity status`)
+  select(-Level, -`Region`, -`Planned start date`, -`Actual start date`,  -`Planned end date`,
+         -`Actual end date`, -`Activity Status`)
 
 
 roda_extract_newton_final <- roda_extract_newton %>% 
@@ -559,22 +560,22 @@ roda_extract_newton_final <- roda_extract_newton %>%
          title = Title,
          abstract = Description,
          amount = Amount,
-         recipient_country = `Recipient country`,
+         recipient_country = `Benefiting countries`,
          extending_org = `Delivery partner`,
          lead_org_name = `Lead Organisation`,
-         partner_org_name = `Country delivery partners`) %>% 
-  mutate(Fund = "Newton Fund",
+         partner_org_name = `In country partner`) %>% 
+  mutate(Fund = "BEIS - Newton Fund",
          Funder = "Department for Business, Energy and Industrial Strategy",
          lead_org_country = map(lead_org_name, org_country_lookup),
          partner_org_country = NA_character_,
          iati_id = NA_character_,
          link = NA_character_,
-         start_date = as.character(as.Date(coalesce(`Actual start date`, `Planned start date`), "%d %B %Y")),
+         start_date = as.character(as.Date(coalesce(`Actual start date`, as.character(`Planned start date`)), "%d %B %Y")),
          end_date = as.character(as.Date(coalesce(`Actual end date`, `Planned end date`), "%d %B %Y")),
          currency = "GBP",
-         status = if_else(`Activity status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
-                          if_else(`Activity status` %in% c("Completed"), "Closed", 
-                                  if_else(`Activity status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
+         status = if_else(`Activity Status` %in% c("Spend in progress", "Agreement in place", "Delivery", "Finalisation"), "Active",
+                          if_else(`Activity Status` %in% c("Completed"), "Closed", 
+                                  if_else(`Activity Status` %in% c("Cancelled"), "Cancelled", "Unknown"))),
          period_start = NA_character_,
          period_end = NA_character_,
          subject = NA_character_,
@@ -582,8 +583,7 @@ roda_extract_newton_final <- roda_extract_newton %>%
   unnest(cols = lead_org_country) %>%
   # suppress display of end dates that have passed
   mutate(end_date = if_else(Sys.Date() <= end_date, end_date, NA_character_)) %>%
-  
-  select(-Level, -`Recipient region`, -`Planned start date`, -`Activity status`,
+  select(-Level, -`Benefiting region`, -`Planned start date`, -`Activity Status`,
          -`Planned end date`, -`Actual start date`, -`Actual end date`)
 
 # Write lead org names and countries to file
@@ -623,8 +623,8 @@ all_projects <- rbind(ukri_projects_with_countries,
 
 # Manually edit country info for Chevening Scholarships
 all_projects_tidied <- all_projects %>% 
-  mutate(lead_org_country = if_else(Fund == "Chevening Scholarships", "United Kingdom", lead_org_country),
-         start_date = if_else(Fund == "Chevening Scholarships", NA_character_, start_date))
+  mutate(lead_org_country = if_else(Fund == "FCDO - Chevening Scholarships", "United Kingdom", lead_org_country),
+         start_date = if_else(Fund == "FCDO - Chevening Scholarships", NA_character_, start_date))
 
 # Name BEIS delivery partners fully
 all_projects_tidied <- all_projects_tidied %>% 

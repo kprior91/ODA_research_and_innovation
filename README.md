@@ -26,7 +26,7 @@ The following scripts are designed to run sequentially.
 
 **Script 6 - Output 1 (active projects for Tableau).R** - separates and cleans the country field for displaying data in the UKCDR website Tableau map. Applies manual exclusions to the data and saves to a Google Sheet.
 
-**Script 7 - Output 2 (country active project lists).R** - outputs a formatted Excel list of active projects for specified countries
+**Script 7 - Output 2 (country active project lists).R** - outputs a formatted Excel list of active projects for specified countries. This data is no different to the downloads available for Tableau except for formatting in Excel.
 
 **Script 8 - Output 3 (top organisations by country).R** - outputs summary tables of most common institutions by country, based on the number of projects they are involved in
 
@@ -35,13 +35,17 @@ The following scripts are designed to run sequentially.
 
 ### Inputs
 
-* *GRID tables:* references tables in Excel from the online GRID database (https://www.grid.ac/). These are used to look up the country location of research institutions
-* *IATI returns:* project data in spreadsheet format - i.e. that is not yet linked or correctly published to the IATI Registry. It is read in manually to the ODA project database
-* *Country lookup - Tableau and DAC Income Group.xlsx* - reference table to clean country data for Tableau and match to the World Bank income group
 * *BEIS RODA extracts (Excel):* GCRF and Newton project data provided directly by BEIS, extracted from their Reporting ODA (RODA) platform. These should be overwritten by a new cumulative extract each quarter (supplied by BEIS to UKCDR 1.5 months after quarter end)
+* *Country lookup - Tableau and DAC Income Group.xlsx* - reference table to clean country data for Tableau and match to the World Bank income group
+* *GRID tables:* references tables in Excel from the online GRID database (https://www.grid.ac/). These are used to look up the country location of research institutions
+* *FCDO core contribution programmes (with beneficiary countries):* list of manually identified FCDO Research programmes and components that fall out of scope of external partner IATI reporting - i.e. it is not possible to extract information on partners' activities in an automated way. This includes core contribution funding to multilaterals (e.g. World Bank), low-value agreements (e.g. Evidence Fund) and some programmes where the external partner should but is not yet reporting to IATI.
+
+Programmes/components listed on this spreadsheet will be added to the ODA R&I project database at the level of FCDO funding. Any geocoding data from FCDO's AMP system is also included. This avoids large funding gaps for FCDO in the Tableau map data.
+
 * *IATI partner activities.xlsx:* IATI activity IDs of external partner data that should be included in the ODA project database but are not correctly linked in IATI. This means they do not get pulled in in an automated way
+* *MODARI award data - GHS (GAMRIF and UKVN):* Data provided by DHSC on GAMRIF and UK Vaccine Network projects (no new ones have been funded between Aug 21 and Feb 22). New projects are expected in 2022/23 so this spreadsheet will need updating then.
 * *Wellcome grants.xlsx:* ODA grant data provided quarterly by the Wellcome Trust, identified via the UK government partner
-* *UKRI non GCRF-Newton projects.xlsx:* UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). These have been provided directly by UKRI.
+* *UKRI non GCRF-Newton projects.xlsx:* UKRI Gateway to Research IDs for ODA projects co-funded by DHSC or FCDO (non GCRF/Newton). These fall under UKRI's "other ODA" funding and are not currently identifiable on the Gateway to Research website (https://gtr.ukri.org/). The list of project IDs has been provided by UKRI, which I have manually matched to DHSC/FCDO funding programmes. UKRI are planning to publish these projects to IATI in future.
 
 
 ## Outputs

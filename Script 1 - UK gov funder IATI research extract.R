@@ -296,15 +296,15 @@ gov_list <- gov_list %>%
 # Add Fund label
 gov_list <- gov_list %>%  
   mutate(fund = case_when(
-    str_detect(iati_identifier, "Newton|NEWT|NF") ~ "Newton Fund",
-    str_detect(iati_identifier, "GCRF") ~ "Global Challenges Research Fund (GCRF)",
-    str_detect(iati_identifier, "UKVN") ~ "Global Health Security - UK Vaccine Network",
-    str_detect(iati_identifier, "GAMRIF") ~ "Global Health Security - GAMRIF",
-    (str_detect(iati_identifier, "NIHR") | str_detect(activity_title, "NIHR")) ~ "Global Health Research - Programmes",
-    str_detect(iati_identifier, "ICF") ~ "International Climate Finance (ICF)",
-    str_detect(iati_identifier, "Chevening") ~ "Chevening Scholarships",
+    str_detect(iati_identifier, "Newton|NEWT|NF") ~ "BEIS - Newton Fund",
+    str_detect(iati_identifier, "GCRF") ~ "BEIS - Global Challenges Research Fund (GCRF)",
+    str_detect(iati_identifier, "UKVN") ~ "DHSC - Global Health Security - UK Vaccine Network",
+    str_detect(iati_identifier, "GAMRIF") ~ "DHSC - Global Health Security - GAMRIF",
+    (str_detect(iati_identifier, "NIHR") | str_detect(activity_title, "NIHR")) ~ "DHSC - Global Health Research - Programmes",
+    str_detect(iati_identifier, "ICF") ~ "BEIS - International Climate Finance (ICF)",
+    str_detect(iati_identifier, "Chevening") ~ "FCDO - Chevening Scholarships",
     str_detect(iati_identifier, "GB-1-|GB-GOV-1-") ~ "FCDO Research - Programmes",
-    reporting_org_ref == "GB-GOV-10" ~ "Global Health Research - Partnerships",
+    reporting_org_ref == "GB-GOV-10" ~ "DHSC - Global Health Research - Partnerships",
     TRUE ~ "Other"
   ))
 

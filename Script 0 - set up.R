@@ -1,7 +1,7 @@
 
 ### Set end of quarter data for update ----
 
-quarter_end_date <- as.Date("2021-09-30")
+quarter_end_date <- as.Date("2021-12-31")
 
 
 ### Check and install packages ----
@@ -102,8 +102,8 @@ ukri_ooda_projects_ids <- read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx",
 wellcome_grants <- read_excel("Inputs/wellcome grants.xlsx")
 
 # BEIS RODA GCRF/Newton extracts
-roda_extract_gcrf <- read_excel("Inputs/BEIS_GCRF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
-roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q2_2021-2022.xlsx", sheet = 1)
+roda_extract_gcrf <- read_excel("Inputs/BEIS_GCRF_MODARI_Q3_2021-2022.xlsx", sheet = 1)
+roda_extract_newton <- read_excel("Inputs/BEIS_NF_MODARI_Q3_2021-2022.xlsx", sheet = 1)
 
 # DHSC Global Health Security projects
 dhsc_ghs_projects <- read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)

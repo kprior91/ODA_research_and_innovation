@@ -77,10 +77,6 @@ country_table <- all_projects_tidied %>%
   select(project_id = id, location_country, beneficiary_country) %>% 
   unique()
 
-test1 <- filter(country_table, str_detect(project_id, "GCRF-BACSDP-Prg2018-SDP2100014"))
-test2 <- filter(country_table, str_detect(project_id, "GCRF-BACSDP-Prg2018-SDP2100014"))
-test3 <- filter(country_table_cleaned, str_detect(project_id, "GCRF-BACSDP-Prg2018-SDP2100014"))
-
 # Convert location vs. beneficiary country data to long format
 country_table <- country_table %>% 
   gather(key = "country_type", value = "Country", -project_id) %>% 
@@ -117,6 +113,7 @@ country_table_cleaned <- country_table_cleaned %>%
     str_detect(Country, "lao") ~ "laos",
     str_detect(Country, "bolivia") ~ "bolivia",
     str_detect(Country, "syria") ~ "syria",
+    str_detect(Country, "gaza|west bank|palestin") ~ "occupied palestinian territories",
     TRUE ~ Country)) %>% 
   unique() 
 
