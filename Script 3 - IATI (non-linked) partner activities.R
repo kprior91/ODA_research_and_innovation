@@ -202,6 +202,8 @@ activity_list_unnest_3 <- partner_activity_comb %>%
 
 
 # 4) Unlist implementing organisations
+# Warning - some publishers (e.g. IDRC) have implementing org names in multiple 
+  # languages.
 activity_list_unnest_4 <- partner_activity_comb %>%
   select(-activity_id) %>%  # newly added?
   filter(lengths(participating_org) != 0) %>% 
@@ -210,10 +212,6 @@ activity_list_unnest_4 <- partner_activity_comb %>%
   filter(lengths(narrative) != 0,
          role.name == "Implementing") %>% 
   unnest(cols = narrative) %>% 
-  group_by(iati_identifier, role.name, ref) %>%
-  slice(1) %>% 
-  ungroup() %>% 
-  select(-lang.code, -lang.name) %>% 
   unique()
 
   # Identify activities with no implementing partner info

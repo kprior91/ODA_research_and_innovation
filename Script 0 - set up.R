@@ -79,7 +79,7 @@ grid_addresses <- read.csv("Inputs/GRID tables/addresses.csv") %>%
 grid_aliases <- read.csv("Inputs/GRID tables/aliases.csv")
 
 # Country names
-countries <- countrycode::codelist$country.name.en
+countries <- rev(countrycode::codelist$country.name.en)   # reverse to list "Nigeria" before "Niger" for later string detection
 countries_string <- paste0(str_to_lower(countries), collapse = "|")
 
 

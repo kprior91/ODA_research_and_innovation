@@ -65,7 +65,31 @@ saveRDS(funder_table, file = "Outputs/funder_table.rds")
 
 # 3) Create organisation table ----
 
-organisation_table <- org_names_and_locations
+organisation_table <- org_names_and_locations %>% 
+  mutate(organisation_country = str_to_lower(organisation_country)) %>% 
+  # cleaning step 1
+  mutate(organisation_country = str_replace_all(organisation_country, "\\(the\\)", ""),  # remove (the)
+         organisation_country = gsub("[()]", "", organisation_country),                  # remove all parentheses
+         organisation_country = str_replace_all(organisation_country, "tanzania, united republic of", "tanzania"),
+         organisation_country = str_replace_all(organisation_country, "congo the democratic republic of the|drc|democratic republic of congo", 
+                                   "democratic republic of the congo"),
+         organisation_country = str_replace_all(organisation_country, "china people's republic of", "china"),
+         organisation_country = str_replace_all(organisation_country, "democratic people's republic of korea", "democratic people’s republic of korea")) %>% 
+  # cleaning step 2
+  mutate(organisation_country = case_when(
+                      str_detect(organisation_country, "uk|scotland|wales|united kingdom|england|ireland") & organisation_country != "ukraine" ~ "united kingdom",
+                      str_detect(organisation_country, "usa|united states") ~ "united states",
+                      organisation_country == "us" ~ "united states",
+                      str_detect(organisation_country, "ivoire") ~ "ivory coast",
+                      str_detect(organisation_country, "viet") ~ "vietnam",
+                      str_detect(organisation_country, "lao") ~ "laos",
+                      str_detect(organisation_country, "bolivia") ~ "bolivia",
+                      str_detect(organisation_country, "syria") ~ "syria",
+                      str_detect(organisation_country, "gaza|west bank|palestin") ~ "occupied palestinian territories",
+                      TRUE ~ organisation_country)) %>% 
+  mutate(organisation_country = str_to_title(organisation_country))
+
+saveRDS(organisation_table, file = "Outputs/organisation_table.rds")
 
 
 # 4) Create country table ----
