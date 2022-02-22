@@ -1,13 +1,6 @@
 # --------------------------------------------------------------- #
-# Script 8 
+# Script 9 
 # Run automated tests on final ODA R&I project dataset
-# 
-# A) SET UP FUNCTIONS 
-# B) Script 1 - GOV FUNDER IATI RESEARCH ACTIVITIES
-# C) Script 4 - MASTER PROJECT DATASET
-# D) Script 5 - SQL tables
-# E) Script 6 - ACTIVE PROJECT EXTRACT FOR TABLEAU
-# 
 # --------------------------------------------------------------- #
 
 ### Create test comparisons
@@ -20,10 +13,10 @@ gov_funders_expected <- c(
 
 funds_expected <- c("Chevening Scholarships",
                     "FCDO Research - Partnerships", "FCDO Research - Programmes",                 
-                    "Global Challenges Research Fund (GCRF)", "Global Health Research - Partnerships",      
-                    "Global Health Research - Programmes", "Global Health Security - GAMRIF",            
-                    "Global Health Security - UK Vaccine Network", "International Climate Finance (ICF)",        
-                    "Newton Fund", "Other")
+                    "BEIS - Global Challenges Research Fund (GCRF)", "DHSC - Global Health Research - Partnerships",      
+                    "DHSC - Global Health Research - Programmes", "DHSC - Global Health Security - GAMRIF",            
+                    "DHSC - Global Health Security - UK Vaccine Network", "BEIS - International Climate Finance (ICF)",        
+                    "BEIS - Newton Fund", "Other")
 
 
 ### A) SET UP FUNCTIONS ----
@@ -33,27 +26,15 @@ funds_expected <- c("Chevening Scholarships",
 # Test organisation name to country lookup
 expect_equal(org_country_lookup("International Development Research Centre"), "Canada")
 
+# Test "Niger" is not returned over "Nigeria"
+expect_equal(org_country_lookup("Int Inst of Tropical Agriculture Nigeria", "Nigeria"))
 
 ## IATI ##
 
-# Error with this CGIAR page
-# org_code <- "XM-DAC-47015"
-# page <- 77
-# org_activity_extract(page, org_code, data.frame())
-
 ## UKRI ##
 
-# fund_name <- "GCRF"
-# test <- extract_ukri_projects_by_fund(1, fund_name)
-
-# person_id <- "6E394347-A44B-4868-8EC3-06CA4D034BDA"
-# test <- extract_staff_org(person_id)
-
-# org_id <- "C3F01E23-4A38-46BD-B3CE-8983CE6DBF36"
-# test <- extract_org_country(org_id)
-
-# id <- "AH/T007362/1"
-# test <- extract_ukri_projects_by_id(id)
+id <- "BB/T008946/1"
+test <- extract_ukri_projects_by_id(id)
 
 
 ### B) GOV FUNDER IATI RESEARCH ACTIVITIES
@@ -284,7 +265,7 @@ con_live <- DBI::dbConnect(odbc::odbc(),
 # Read in files for testing
 project_table <- readRDS("Outputs/project_table.rds")
 funder_table <- readRDS("Outputs/funder_table.rds")
-org_names_and_locations <- readRDS("Outputs/org_names_and_locations.rds")
+organisation_table <- readRDS("Outputs/organisation_table.rds")
 country_table <- readRDS(file = "Outputs/country_table.rds")
 country_table_cleaned <- readRDS(file = "Outputs/country_table_cleaned.rds")
 

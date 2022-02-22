@@ -99,13 +99,8 @@ sum(nihr_active$amount)
 
 ### 5) NIHR GHR Partnerships
 
-# Use Power BI IATI dashboard
-# Status: Implementation
-# Fund: 
-# Budget: 
 
-
-### DHSC GAMRIF and UK Vaccine Network
+### 6) DHSC GAMRIF and UK Vaccine Network
 
 ghs_awards <- tableau_projects_tidied %>% 
   filter(Fund %in% c("Global Health Security - UK Vaccine Network", "Global Health Security - GAMRIF")) %>% 
@@ -115,7 +110,7 @@ ghs_awards <- tableau_projects_tidied %>%
 sum(ghs_awards$amount, na.rm = TRUE)
 
 
-### Wellcome
+### 7) Wellcome
 
 wellcome_grant_sum <- tableau_projects_tidied %>% 
   filter(str_detect(extending_org, "Wellcome"),

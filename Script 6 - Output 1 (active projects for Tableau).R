@@ -7,6 +7,7 @@
 all_projects_tidied <- readRDS("Outputs/all_projects_tidied.rds")
 country_table_final <- readRDS("Outputs/country_table_final.rds")
 
+
 # 1) Join countries to project data ----
 
 tableau_projects <- all_projects_tidied %>% 
