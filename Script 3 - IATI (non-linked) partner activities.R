@@ -203,7 +203,7 @@ activity_list_unnest_3 <- partner_activity_comb %>%
 
 # 4) Unlist implementing organisations
 # Warning - some publishers (e.g. IDRC) have implementing org names in multiple 
-  # languages.
+  # languages. These are nnot filtered out currently
 activity_list_unnest_4 <- partner_activity_comb %>%
   select(-activity_id) %>%  # newly added?
   filter(lengths(participating_org) != 0) %>% 
@@ -413,27 +413,35 @@ saveRDS(transaction_list, file = "Outputs/transaction_list.rds")
                  !str_detect(str_to_lower(transaction_receiver_name), "disbursement")) %>% 
           unique()
         
-        # Add to organisation name and country database
-        receiver_orgs_to_save <- transaction_receiver_orgs %>% 
-          inner_join(no_partner_info, by = "iati_identifier") %>% 
-          rename(project_id = iati_identifier,
-                 organisation_name = transaction_receiver_name) %>% 
-          # Look up country from both country code and organisation name
-          mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
-          mutate(organisation_country = unlist(organisation_country)) %>% 
-          mutate(organisation_role = 2) # partners
-          
-          # Add on to org file to save
-          org_names_and_locations_1 <- org_names_and_locations_1 %>% 
-          rbind(receiver_orgs_to_save)      
-        
+            # Add to organisation name and country database
+            receiver_orgs_to_save <- transaction_receiver_orgs %>% 
+              inner_join(no_partner_info, by = "iati_identifier") %>% 
+              rename(project_id = iati_identifier,
+                     organisation_name = transaction_receiver_name) %>% 
+              # Look up country from both country code and organisation name
+              mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
+              mutate(organisation_country = unlist(organisation_country)) %>% 
+              mutate(organisation_role = 2) # partners
+              
+              # Add on to org file to save
+              org_names_and_locations_1 <- org_names_and_locations_1 %>% 
+              rbind(receiver_orgs_to_save)      
+            
         
         # Summarise orgs for joining to main dataset
         transaction_orgs_summarised <- transaction_receiver_orgs %>% 
           group_by(iati_identifier) %>% 
           summarise(transaction_receiver_name = paste(coalesce(transaction_receiver_name, ""), collapse = ", "))
+       
+         # Summarise org countries for joining to main dataset
+        transaction_org_countries_summarised <- receiver_orgs_to_save %>% 
+          select(iati_identifier = project_id, organisation_country) %>% 
+          unique() %>% 
+          filter(!is.na(organisation_country)) %>% 
+          group_by(iati_identifier) %>% 
+          summarise(transaction_receiver_country = paste(coalesce(organisation_country, ""), collapse = ", "))
         
-        
+      
       # Join on transactions country and org info to relevant datasets
         activity_list_unnest_2 <- partner_activity_comb %>% 
           select(iati_identifier) %>% 
@@ -446,8 +454,10 @@ saveRDS(transaction_list, file = "Outputs/transaction_list.rds")
           select(iati_identifier) %>% 
           left_join(activity_list_unnest_4, by = "iati_identifier") %>%
           left_join(transaction_orgs_summarised, by = "iati_identifier") %>% 
-          mutate(partner = coalesce(partner, transaction_receiver_name)) %>% 
-          select(-transaction_receiver_name)
+          left_join(transaction_org_countries_summarised, by = "iati_identifier") %>% 
+          mutate(partner = coalesce(partner, transaction_receiver_name),
+                 partner_country = coalesce(partner_country, transaction_receiver_country)) %>% 
+          select(-transaction_receiver_name, -transaction_receiver_country)
           
 
 # Join unnested info to original data
