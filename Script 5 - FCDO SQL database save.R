@@ -133,6 +133,7 @@ country_table_cleaned <- country_table_cleaned %>%
     Country == "us" ~ "united states",
     str_detect(Country, "ivoire") ~ "ivory coast",
     str_detect(Country, "viet") ~ "vietnam",
+    str_detect(Country, "netherlands") ~ "netherlands",
     str_detect(Country, "lao") ~ "laos",
     str_detect(Country, "bolivia") ~ "bolivia",
     str_detect(Country, "syria") ~ "syria",
