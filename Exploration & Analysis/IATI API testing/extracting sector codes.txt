@@ -1,0 +1,38 @@
+list.of.packages <- c("data.table", "httr", "jsonlite", "dotenv", "dplyr")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(list.of.packages, require, character.only=T)
+
+API_KEY = "cb77cc509def49f9b37a00aefe5ee99f"
+authentication = add_headers(`Ocp-Apim-Subscription-Key` = API_KEY)
+
+
+# Function to extract 5-digit OECD sector codes
+sector_extract <- function(page, sector_list) {
+  path <- paste0("https://api.iatistandard.org/datastore/activity'/select?",
+  "q=*:*",
+  "&wt=json&fl=sector_code*&page=", page)
+  request <- GET(url = path, authentication)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  # Condition to check when 5-digit codes stop being returned
+  if(!("category" %in% names(response$results))) {
+    sector_list <- rbind(sector_list, response$results)
+  } else {
+    sector_list <- sector_list
+  }
+  return(sector_list)
+}
+
+
+# Extract list of OECD research sector codes from IATI ------ # Prepare results data frame and counters
+sector_list <- data.frame()
+new_rows <- 0
+page <- 1 # Run extraction, stopping when no new sector codes returned
+while (page == 1 | new_rows > 0) {
+  x <- nrow(sector_list)
+  sector_list <- sector_extract(page, sector_list)
+  page <- page + 1
+  y <- nrow(sector_list)
+  new_rows = y - x
+}
