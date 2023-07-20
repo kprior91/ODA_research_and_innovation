@@ -85,7 +85,7 @@ ri_linked_activites <- linked_transaction_extract %>%
 # Save to Rdata file
 # saveRDS(ri_linked_activites, file = "Outputs/ri_linked_activites_kp.rds")
 ri_linked_activites <- readRDS(file = "Outputs/ri_linked_activites_kp.rds")
-#ri_linked_activites_ec <- readRDS(file = "Outputs/ri_linked_activites.rds")
+# ri_linked_activites_ec <- readRDS(file = "Outputs/ri_linked_activites.rds")
 
 # Clear environment
 rm(ri_iati_activities, new_rows, page, path, id, x, y, request, response, new_data, transactions_dataset, 

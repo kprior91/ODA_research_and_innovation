@@ -25,6 +25,8 @@ organisation_codes <- c("GB-GOV-1",  # FCDO
                         "GB-GOV-15", # DIT
                         "GB-GOV-50") # Prosperity Fund
 
+#organisation_codes <- c("GB-GOV-7")
+
 
 specific_org_extract <- function(o_code) {
   page_list <- list()
@@ -51,7 +53,7 @@ uk_gov_list_final = rbindlist(uk_gov_list_final, fill=T)
 
 # Save output data
 # You can bypass the previous step by reading it in from the Outputs folder
-#saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final_kp.rds")
+# saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final_kp.rds")
 uk_gov_list_final <- readRDS(file = "Outputs/uk_gov_list_final_kp.rds")
 
 
@@ -71,7 +73,7 @@ ri_iati_activities <- uk_gov_ri_programmes %>%
   mutate(tag_code = "RI")
 
 # You can bypass the previous step by reading it in from the Outputs folder
-#saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities_kp.rds")
+# saveRDS(ri_iati_activities, file = "Outputs/ri_iati_activities_kp.rds")
 ri_iati_activities <- readRDS(file = "Outputs/ri_iati_activities_kp.rds")
 
 
@@ -84,7 +86,7 @@ uk_gov_list_filtered <- uk_gov_list_final %>%
           str_detect(iati_identifier, "GB-GOV-3") |                               # Include everything ex-FCDO
           !is.na(tag_code) |                                                      # Include tagged R&I programmes
           str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Include BEIS Newton/GCRF and DHSC GHS/GHR activities
-          default_flow_type_code == "10")                                             # Restrict to ODA funding only
+          default_flow_type_code == "10" | is.na(default_flow_type_code))         # Restrict to ODA funding only
 
 
 # 4) Unnest activity information -----------
@@ -102,6 +104,15 @@ gov_list_base <- uk_gov_list_filtered %>%
          activity_status = str_replace(activity_status, "6", "Suspended"))
 
 
+# paste_test <- data.frame(a = c(101,102,102,103,103), b = c("G","G","G","G","G"), c = c("i am going","to test this","in my dataframe","to see if i","can fix this paste issue"))
+# 
+# paste_test %>%
+#   unite(new, c("b","c"),sep = ":") %>%
+#   group_by(a) %>%
+#   mutate(new2 = paste0(new, collapse = "; ")) %>%
+#   select(a, new2) %>%
+#   unique()
+
 # A) Unlist activity title and description
 gov_list_unnest_1 <- uk_gov_list_filtered %>% 
    # title
@@ -109,18 +120,25 @@ gov_list_unnest_1 <- uk_gov_list_filtered %>%
   unnest(cols = title_narrative) %>% 
   #rename(activity_title = text) %>% 
    # description
-  unnest(cols = description_narrative) %>% 
-  #mutate(type.name = coalesce(type.name, "General")) %>% 
-  select(iati_identifier, title_narrative, description_narrative) %>% 
+  unnest(cols = c(description_narrative,description_type)) %>% 
+  mutate(description_type = str_replace(description_type, "1", "General"),
+         description_type = str_replace(description_type, "2", "Objectives"),
+         description_type = str_replace(description_type, "3", "Target Groups")) %>%
+  mutate(description_type = coalesce(description_type, "General")) %>% 
+  select(iati_identifier, title_narrative, description_type, description_narrative) %>%
+  unite(description, c("description_type", "description_narrative"), sep = ": ") %>%
+  group_by(iati_identifier, title_narrative) %>%
+  mutate(new_description_narrative = paste0(description, collapse = "; ")) %>%
+  select(iati_identifier, title_narrative, new_description_narrative) %>% 
   #unnest(cols = narrative) %>%     
-  unique() %>% rename(activity_title = title_narrative, activity_description = description_narrative)
+  unique() %>% rename(activity_title = title_narrative, activity_description = new_description_narrative)
 
       # Summarise records with multiple "General" descriptions
-      # gov_list_unnest_1 <- gov_list_unnest_1 %>% 
-      #       group_by(iati_identifier, title_narrative, type.name) %>% 
-      #       summarise(text = paste(coalesce(text, ""), collapse = "\n\n")) %>% 
-      #       spread(key = type.name, value = text) %>% 
-      #       mutate(activity_description = if_else(!is.na(Objectives), paste0(General, "\n\n", Objectives), General)) %>% 
+      # gov_list_unnest_1 <- gov_list_unnest_1 %>%
+      #       group_by(iati_identifier, activity_title, description_type) %>%
+      #       summarise(text = paste(coalesce(text, ""), collapse = "\n\n")) %>%
+      #       spread(key = description_type, value = text) %>%
+      #       mutate(activity_description = if_else(!is.na(Objectives), paste0(General, "\n\n", Objectives), General)) %>%
       #       ungroup()
 
 
@@ -226,6 +244,16 @@ gov_list_unnest_4 <- uk_gov_list_filtered %>%
       left_join(gov_list_unnest_4_partners, by = "iati_identifier") %>% 
       left_join(gov_list_unnest_4_countries, by = "iati_identifier") %>%
       unique()
+    
+    # Identify activities with no implementing partner info
+    no_partner_info <- gov_list_unnest_4 %>%
+      select(iati_identifier) %>%
+      mutate(has_implementing_partner_info = "Yes") %>%
+      unique() %>%
+      right_join(uk_gov_list_filtered, by = "iati_identifier") %>%
+      filter(is.na(has_implementing_partner_info)) %>%
+      select(iati_identifier) %>%
+      unique()
 
 
 # E) Unlist extending organisations
@@ -299,6 +327,7 @@ gov_list_unnest_8 <- uk_gov_list_filtered %>%
   select(iati_identifier, start_date, end_date)
 
 
+
 # Join unnested info to original data
 gov_list <- gov_list_base %>% 
   left_join(gov_list_unnest_1, by = "iati_identifier") %>%
@@ -311,9 +340,9 @@ gov_list <- gov_list_base %>%
   left_join(gov_list_unnest_8, by = "iati_identifier")
 
 # Remove non-research activities for all departments apart from BEIS, DHSC, FCDO based on sector information
-gov_list <- gov_list %>% 
+gov_list <- gov_list %>%
   filter(reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10", "GB-GOV-13") & !str_detect(iati_identifier, "GB-GOV-3") |
-           !is.na(sector_name))  
+           !is.na(sector_name))
 
 # Reorder columns and add date of refresh
 gov_list <- gov_list %>% 
@@ -357,7 +386,7 @@ gov_list <- gov_list %>%
 # spend is not being double-counted for FCDO
 
 gov_list_final <- gov_list %>% 
-  filter((reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10") & hierarchy == 2) | # FCDO, DHSC - keep child activities 
+  filter((reporting_org_ref %in% c("GB-GOV-1", "GB-GOV-10") & hierarchy != 1) | # FCDO, DHSC - keep child activities 
             str_detect(iati_identifier, "GB-GOV-3") |                           # keep ex-FCO activities
             reporting_org_ref %in% c("GB-GOV-7", "GB-GOV-12", "GB-GOV-13", "GB-GOV-50")) # Defra, DCMS, BEIS, Prosperity Fund - keep parent activities
 
@@ -365,23 +394,192 @@ gov_list_final <- gov_list %>%
 # Join on FCDO parent (programme) descriptions to child (component) activities
 gov_list_final <- gov_list_final %>%
      # Extract FCDO programme activity ID
-  mutate(programme_id = if_else(hierarchy == 2 & reporting_org_ref == "GB-GOV-1",
-                                substr(iati_identifier, 1, nchar(iati_identifier)-4), NA_character_)) %>%
-     # Join on programme title
-  left_join(select(gov_list_unnest_1,
-                   iati_identifier,
-                   programme_title = activity_title,
-                   programme_description = activity_description),
-            by = c("programme_id" = "iati_identifier")) %>%
-  mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
-                                        programme_description,
-                                        activity_description))
+  mutate(programme_id = if_else(hierarchy == 2 & fund == "FCDO Research - Programmes",
+                                substr(iati_identifier, 1, nchar(iati_identifier)-4), NA_character_))
+  # %>%
+  #    # Join on programme title
+  # left_join(select(gov_list_unnest_1,
+  #                  iati_identifier,
+  #                  programme_title = activity_title,
+  #                  programme_description = activity_description),
+  #           by = c("programme_id" = "iati_identifier")) %>%
+  # mutate(activity_description = if_else(reporting_org_ref == "GB-GOV-1",
+  #                                       programme_description,
+  #                                       activity_description))
 
+# 6) Save to Rdata file ----
+# saveRDS(gov_list_final, file = "Outputs/gov_list_final_kp.rds")
+gov_list_final <- readRDS("Outputs/gov_list_final_kp.rds")
+# write.xlsx(gov_list_final, file = "Outputs/gov_list_final_kp.xlsx")
+
+# I) Extract transactions
+
+##### this extracts countries listed in the transactions####
+
+specific_trans_extract_country <- function(id) {
+  page_list <- list()
+  page <- 1
+  page_df = data.frame()
+  
+  while (!is.null(page_df)) {
+    Sys.sleep(1)
+    message(page)
+    page_df <- transactions_extract_country(page, id)
+    if(!is.null(page_df)){
+      page_list[[page]] = page_df
+    }
+    page = page + 1
+  }
+  rbindlist(page_list, fill=T)
+}
+
+# specific_org_extract("GB-GOV-15")
+
+gov_transaction_list_countries <- lapply(unique(gov_list_final$iati_identifier), specific_trans_extract_country)
+gov_transaction_list_countries = rbindlist(gov_transaction_list_countries, fill=T)
+
+# Save to Rdata file
+# saveRDS(gov_transaction_list_countries, file = "Outputs/gov_transaction_list_countries.rds")
+gov_transaction_list_countries <- readRDS(file = "Outputs/gov_transaction_list_countries.rds")
+
+gov_transaction_list_countries$recipient_country <- countrycode_list$name[match(gov_transaction_list_countries$transaction_recipient_country_code,countrycode_list$code)]
+
+# Extract recipient countries (where included in transactions)
+gov_transaction_countries <- gov_transaction_list_countries %>% 
+  select(iati_identifier, recipient_country) %>% 
+  # rename and remove blanks
+  filter(!is.na(recipient_country)) %>% 
+  unique()
+
+# Summarise countries for joining to main dataset
+gov_transaction_countries_summarised <- gov_transaction_countries %>% 
+  group_by(iati_identifier) %>% 
+  summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
+
+
+##### this extracts recipients
+
+specific_trans_extract_recipient <- function(id) {
+  page_list <- list()
+  page <- 1
+  page_df = data.frame()
+  
+  while (!is.null(page_df)) {
+    Sys.sleep(1)
+    message(page)
+    page_df <- transactions_extract_recipient(page, id)
+    if(!is.null(page_df)){
+      page_list[[page]] = page_df
+    }
+    page = page + 1
+  }
+  rbindlist(page_list, fill=T)
+}
+
+# specific_org_extract("GB-GOV-15")
+
+gov_transaction_list_recipient <- lapply(unique(gov_list_final$iati_identifier), specific_trans_extract_recipient)
+gov_transaction_list_recipient = rbindlist(gov_transaction_list_recipient, fill=T)
+
+# Save to Rdata file
+# saveRDS(gov_transaction_list_recipient, file = "Outputs/gov_transaction_list_recipient.rds")
+gov_transaction_list_recipient <- readRDS(file = "Outputs/gov_transaction_list_recipient.rds")
+
+
+# Extract receiver organisations
+gov_transaction_recipient <- gov_transaction_list_recipient %>% 
+  select(iati_identifier, transaction_receiver_org_narrative) %>% 
+  # unnest organisation names
+  #filter(lengths(receiver_organisation.narrative) != 0) %>% 
+  unnest(cols = transaction_receiver_org_narrative) %>% 
+  #select(-lang.code, -lang.name) %>% 
+  #rename(transaction_receiver_name = text) %>% 
+  # Exclude blanks, other text
+  filter(!is.na(transaction_receiver_org_narrative), 
+         !str_detect(str_to_lower(transaction_receiver_org_narrative), "reimbursement"),
+         !str_detect(str_to_lower(transaction_receiver_org_narrative), "disbursement")) %>% 
+  unique()
+
+# Add to organisation name and country database
+receiver_orgs_to_save <- gov_transaction_recipient %>% 
+  inner_join(no_partner_info, by = "iati_identifier") %>% 
+  rename(project_id = iati_identifier,
+         organisation_name = transaction_receiver_org_narrative) %>% 
+  # Look up country from both country code and organisation name
+  mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
+  mutate(organisation_country = unlist(organisation_country)) %>% 
+  mutate(organisation_role = 2) # partners
+
+
+# Add on to org file to save
+org_names_and_locations_1 <- receiver_orgs_to_save
+
+
+# Summarise orgs for joining to main dataset
+gov_transaction_recipient_summarised <- gov_transaction_recipient %>% 
+  group_by(iati_identifier) %>% 
+  summarise(transaction_receiver_org_narrative = paste(coalesce(transaction_receiver_org_narrative, ""), collapse = ", "))
+
+# Summarise org countries for joining to main dataset
+gov_transaction_org_countries_summarised <- receiver_orgs_to_save %>% 
+  select(iati_identifier = project_id, organisation_country) %>% 
+  unique() %>% 
+  filter(!is.na(organisation_country)) %>% 
+  group_by(iati_identifier) %>% 
+  summarise(transaction_receiver_country = paste(coalesce(organisation_country, ""), collapse = ", "))
+
+
+# Join on transactions country and org info to relevant datasets
+gov_list_final <- gov_list_final %>% 
+  left_join(gov_transaction_recipient_summarised, by = "iati_identifier") %>%
+  mutate(partner = coalesce(partner, transaction_receiver_org_narrative)) %>%
+  select(!transaction_receiver_org_narrative)
+
+gov_list_final <- gov_list_final %>% 
+  left_join(gov_transaction_org_countries_summarised, by = "iati_identifier") %>%
+  mutate(partner_country = coalesce(partner_country, transaction_receiver_country)) %>%
+  select(!transaction_receiver_country)
+
+gov_list_final <- gov_list_final %>% 
+  left_join(gov_transaction_countries_summarised, by = "iati_identifier") %>%
+  mutate(recipient_country_region = coalesce(recipient_country_region, recipient_country)) %>%
+  select(!recipient_country)
 
 
 # 6) Save to Rdata file ----
 # saveRDS(gov_list_final, file = "Outputs/gov_list_final_kp.rds")
 gov_list_final <- readRDS("Outputs/gov_list_final_kp.rds")
+# write.xlsx(gov_list_final, file = "Outputs/gov_list_final_kp.xlsx")
+
+# Doing a lookup from the geocoding/location data to the IATI extract
+
+RED_AMP_ids <- c(RED_AMP_location[[1]])
+RED_AMP_location <- RED_AMP_location %>% rename(RED_id = ProjectId)
+
+pat <- str_c(RED_AMP_ids, collapse = "|")
+
+RED_extract <-
+  gov_list_final %>% 
+  filter(reporting_org_ref=="GB-GOV-1") %>%
+  select(iati_identifier) %>%
+  mutate(RED_id = str_extract_all(paste(iati_identifier), pat)) %>%
+  filter(lengths(RED_id)>0)
+
+RED_extract$RED_id <- as.character(RED_extract$RED_id)
+
+RED_extract <-
+  RED_extract %>%
+  left_join(RED_AMP_location, by = "RED_id")
+
+gov_list_final_red <-
+gov_list_final %>%
+  left_join(RED_extract, by = "iati_identifier") %>%
+  mutate(recipient_country_region = coalesce(recipient_country_region, Country_Name)) %>%
+  select(-RED_id, -Country_Name) %>% 
+  rename(recipient_country = recipient_country_region)
+
+# saveRDS(gov_list_final_red, file = "Outputs/gov_list_final_red.rds")
+gov_list_final_red <- readRDS("Outputs/gov_list_final_red.rds")
 
 # Clear environment variables
 rm(uk_gov_list_filtered, gov_list, gov_list_base, gov_list_unnest_1, gov_list_unnest_2, gov_list_unnest_2_country, gov_list_unnest_2_region, gov_list_unnest_3, 

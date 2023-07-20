@@ -102,25 +102,41 @@ dac_lookup <- readxl::read_xlsx("Inputs/Country lookup - Tableau and DAC Income 
 ### Input data ----
 
 # FCDO partner IATI activities (to add manually as not linked) 
+# see the R script "checking_linking_RED_data.R" for how I collated this spreadsheet
 unlinked_partner_iati_activity_ids <- readxl::read_xlsx("Inputs/IATI partner activities_kp.xlsx", sheet=1)
 
 # UKRI non GCRF/Newton project IDs
-ukri_ooda_projects_ids <- readxl::read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1) %>% 
-  mutate(recipient_country = NA_character_)
+# ukri_ooda_projects_ids <- readxl::read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1) %>% 
+#  mutate(recipient_country = NA_character_)
 
 # Wellcome ODA grant data
-wellcome_grants <- readxl::read_excel("Inputs/wellcome grants.xlsx")
+wellcome_grants <- readxl::read_excel("Inputs/Wellcome grants_2023.xlsx")
 
 # BEIS RODA GCRF/Newton extracts
-roda_extract_gcrf <- readxl::read_excel("Inputs/BEIS_GCRF_MODARI_Q3_2021-2022.xlsx", sheet = 1)
-roda_extract_newton <- readxl::read_excel("Inputs/BEIS_NF_MODARI_Q3_2021-2022.xlsx", sheet = 1)
+roda_extract_gcrf <- readxl::read_excel("Inputs/BEIS_GCRF_MODARI_Q4_2022-2023.xlsx", sheet = 1)
+roda_extract_newton <- readxl::read_excel("Inputs/BEIS_NF_MODARI_Q4_2022-2023.xlsx", sheet = 1)
+
+# DEFRA ODA grant data
+defra_grants <- readxl::read_excel("Inputs/DEFRA_MODARI_data_request.xlsx")
 
 # DHSC Global Health Security projects
-dhsc_ghs_projects <- readxl::read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)
+# dhsc_ghs_projects <- readxl::read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)
 
 # DHSC/FCDO core contribution programmes/components 
 # (these are out of scope of IATI)
-gov_non_iati_programmes <- readxl::read_excel("Inputs/FCDO core contribution programmes (with beneficiary countries).xlsx") 
+gov_non_iati_programmes <- readxl::read_excel("Inputs/FCDO core contribution programmes (with beneficiary countries)_kp.xlsx")
+
+# DHSC co-funded projects
+DHSC_cofund <- readxl::read_excel("Inputs/UKRI-DHSC co-funded awards.xlsx")
+
+# FCDO RED programmes Location data. Will need to compare countries here to countries found through IATI
+
+RED_AMP_location <- readxl::read_excel("Inputs/byProject_RED_endMay23_Programmes with geography data.xlsx")
+RED_AMP_location <- RED_AMP_location %>% 
+  group_by(ProjectId) %>% 
+  rename(Country_Name = Name) %>%
+  summarise(Country_Name = paste(coalesce(Country_Name, ""), collapse = ", "))
+
 
 
 ### Functions -----
@@ -159,6 +175,8 @@ countrycode_list <- read.csv("https://iatistandard.org/reference_downloads/203/c
 
 regioncode_list <- read.csv("https://iatistandard.org/reference_downloads/203/codelists/downloads/clv3/csv/en/Region.csv")
 
+
+IATI_org_ID_list <- read.csv("https://iatistandard.org/reference_downloads/203/codelists/downloads/clv3/csv/en/IATIOrganisationIdentifier.csv")
 
 # KP - i'm not quite sure what this function is doing, i've got it to return a country code, but there's no country name
 
@@ -247,7 +265,7 @@ iati_activity_extract <- function(page, activity_id) {
                  '"&wt=json',
                  '&rows=',rows,
                  '&start=',start,
-                 "&fl=iati_identifier,other_identifier*,reporting_org*,location*,sector_code*,default_flow_type*,recipient_country_code,recipient_region_code,activity_date*,budget*,policy_marker*,activity_status*,hierarchy*,title*,description*,participating_org*,related_activity*")
+                 "&fl=iati_identifier,other_identifier*,reporting_org*,location*,sector_code*,default_flow_type*,recipient_country_code,recipient_region_code,activity_date*,budget*,policy_marker*,activity_status*,hierarchy*,title*,description*,participating_org*,related_activity*,tag*")
   request <- GET(url = path, authentication)
   message(request$status_code)
   response <- content(request, as = "text", encoding = "UTF-8")
@@ -289,6 +307,50 @@ org_activity_extract <- function(page, org_code) {
 
 }
 
+# Function to extract IDRC
+
+org_activity_extract_IDRC <- function(page, IDRC) {
+  rows = 1000
+  start <- (page - 1) * rows
+  path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
+                 'q=reporting_org_ref:"',
+                 IDRC,
+                 '"&wt=json',
+                 '&rows=',rows,
+                 '&start=',start,
+                 "&fl=iati_identifier,other_identifier*,activity_date*,reporting_org*,sector_code*,location*,recipient_country_code,recipient_region_code,default_flow_type*,budget*,policy_marker*,activity_status*,hierarchy*,title*,description*,participating_org*,related_activity*,tag*")
+  request <- GET(url = path, authentication)
+  message(request$status_code)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  new_data <- response$response$docs
+  numb_data <- response$response$numFound
+  
+  if(start >= numb_data){
+    return(NULL)
+  }
+  flat_data_list = list() 
+  flat_data_index = 1
+  for(i in 1:nrow(new_data)){
+    row = new_data[i,]
+    participating_org_cols = which(startsWith(names(new_data),"participating_org"))
+    participating_org_data = row[,participating_org_cols]
+    row[,participating_org_cols] = NULL
+    for(j in 1:length(participating_org_data[1,1][[1]])){
+      org_row = row
+      for(k in 1:length(participating_org_cols)){
+        if(!is.null(participating_org_data[1,k][[1]])){
+          org_row[1,names(participating_org_data)[k]] = participating_org_data[1,k][[1]][j]
+        }
+      }
+      flat_data_list[[flat_data_index]] = org_row
+      flat_data_index = flat_data_index + 1
+    }
+  }
+  return(rbindlist(flat_data_list, fill=T))
+  
+}
+
 # Function to extract COUNTRIES from transactions for a specified IATI activity ID
 transactions_extract_country <- function(page, activity_id) {
   rows <- 1000
@@ -314,6 +376,8 @@ transactions_extract_country <- function(page, activity_id) {
   return(new_data)
   
 }
+
+
 
 # Function to extract RECIPIENTS from transactions for a specified IATI activity ID
 transactions_extract_recipient <- function(page, activity_id) {
@@ -343,11 +407,9 @@ transactions_extract_recipient <- function(page, activity_id) {
 
 # Function to extract activity names from an IATI activity ID
 
-extract_iati_activity_name <- function(activity_id) {
-  
-  # Reformat ID if it contains spaces (for API)
-  activity_id <- str_replace_all(activity_id, " ", "%20")
-  
+extract_iati_activity_name <- function(page, activity_id) {
+  rows <- 1000
+  start <- (page - 1) * rows
   path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
                  'q=iati_identifier:"',
                  activity_id,
@@ -356,25 +418,19 @@ extract_iati_activity_name <- function(activity_id) {
                  '&start=', start,
                  "&fl=iati_identifier,title*")
   request <- GET(url = path, authentication)
+  message(request$status_code)
   response <- content(request, as = "text", encoding = "UTF-8")
-  response <- fromJSON(response, flatten = TRUE) 
+  response <- fromJSON(response, flatten = TRUE)
   new_data <- response$response$docs
   numb_data <- response$response$numFound
-  
-  if(length(new_data) > 0) {
-    new_data <- new_data %>% 
-      unnest(col = title.narrative) %>% 
-      select(funder_iati_id = iati_identifier, funder_programme = text)
-    
-    result <- new_data$funder_programme
-    
-  } else {
-    result <- NA_character_
+
+  if(start >= numb_data) {
+    return(NULL)
   }
-  
-  return(result)
-  
+  return(new_data)
+
 }
+
 
 
 ### UKRI ###
