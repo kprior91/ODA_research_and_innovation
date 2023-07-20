@@ -254,17 +254,19 @@ gov_list_unnest_7 <- uk_gov_list_filtered %>%
 
 # H) Unlist start/end dates
 gov_list_unnest_8 <- uk_gov_list_filtered %>% 
-  filter(lengths(activity_date) != 0) %>%
-  unnest(cols = activity_date) %>% 
+  filter(lengths(activity_date_iso_date) != 0) %>%
+  unnest(c(activity_date_iso_date,activity_date_type)) %>% 
   select(iati_identifier, 
-         date = iso_date,
-         date_type = type.name) %>%
+         activity_date_iso_date,
+         activity_date_type) %>%
   unique() %>% 
-  spread(key = date_type, value = date) %>% 
-  mutate(start_date = coalesce(`Actual start`, `Planned start`),
-         end_date = coalesce(`Actual end`, `Planned End`)) %>% 
+  spread(key = activity_date_type, value = activity_date_iso_date) %>% 
+  mutate(start_date = coalesce(`2`, `1`),
+         end_date = coalesce(`4`, `3`)) %>% 
   select(iati_identifier, start_date, end_date)
 
+
+# Just need to fix some of these column headings in the individual data frames
 
 # Join unnested info to original data
 gov_list <- gov_list_base %>% 

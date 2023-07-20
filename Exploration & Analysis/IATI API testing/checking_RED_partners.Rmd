@@ -1,0 +1,437 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# Example Datastore API usage to fetch one IATI identifier
+list.of.packages <- c("data.table", "httr", "jsonlite", "dotenv", "dplyr","openxlsx","tidyverse")
+new.packages <- list.of.packages[!(list.of.packages %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(list.of.packages, require, character.only=T)
+
+API_KEY = "cb77cc509def49f9b37a00aefe5ee99f"
+authentication = add_headers(`Ocp-Apim-Subscription-Key` = API_KEY)
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.
+
+```{r Do not run this unless you want to do another partner assessment, instead read in the file in the next chunk}
+# Gets all FCDO activities from the IATI API (except it seems to miss some, need to work that out)
+
+# org_activity_extract <- function(page, org_code) {
+#   rows = 1000
+#   start <- (page - 1) * rows
+#   path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
+#                  'q=reporting_org_ref:"',
+#                  org_code,
+#                  '"&wt=json',
+#                  '&rows=',rows,
+#                  '&start=',start,
+#                  "&fl=iati_identifier,participating_org*")
+#   request <- GET(url = path, authentication)
+#   message(request$status_code)
+#   response <- content(request, as = "text", encoding = "UTF-8")
+#   response <- fromJSON(response, flatten = TRUE) 
+#   new_data <- response$response$docs
+#   numb_data <- response$response$numFound
+#   
+#   if(start >= numb_data){
+#     return(NULL)
+#   }
+#   return(new_data)
+# }
+# 
+# page_list <- list()
+# page <- 1
+# page_df = data.frame()
+# while (!is.null(page_df)) {
+#   Sys.sleep(1)
+#   message(page)
+#   page_df <- org_activity_extract(page, "GB-GOV-1")
+#   if(!is.null(page_df)){
+#     page_list[[page]] = page_df
+#   }
+#   page = page + 1
+# }
+# 
+# all_data = rbindlist(page_list, fill=T)
+# 
+# new_data_edit <- all_data
+# 
+# # This is now matching up (using grepl) the RED prog IDs teams gave me, because the API loses this (they are buried in the iati_identifier)
+# 
+# activity_id_char <- as.character(activity_id)
+# results <- character(nrow(new_data_edit))
+# 
+# for (activity in activity_id_char) {
+#   results[grepl(activity, new_data_edit$iati_identifier)] <- paste0(results[grepl(activity, new_data_edit$iati_identifier)], activity, collapse = NULL)
+# }
+# new_data_edit$RED_activity <- results
+# length(unique(new_data_edit$RED_activity))
+# 
+# # Subset the RED activities
+# new_data_edit_red <- new_data_edit[new_data_edit$RED_activity != "",]
+# 
+# 
+# # Some leftovers that don't seem to get picked up by my API query - shame! will have to run a separate one with these. solved for this exercise but not long term (or modari potentially)
+# # Actually all except "205219", the others were not active, i searched for each one on d portal
+# 
+# leftovers <- activity_id_char[!activity_id_char %in% unique(new_data_edit$RED_activity)]
+# length(leftovers) # this time 16, with 5 that should be on IATI
+# 
+# # This gets the IATI data which was missing from the initial API run
+# 
+# path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
+#                #make_qstring(activity_id_char),
+#                'q=iati_identifier:(%22GB-1-204867%22 %22GB-1-204931%22 %22GB-1-205053%22 %22GB-1-205121%22)',
+#                '&rows=1000',
+#                '&wt=json',
+#                "&fl=iati_identifier,participating_org*")
+# request <- GET(url = path, authentication)
+# response <- content(request, as = "text", encoding = "UTF-8")
+# response <- fromJSON(response, flatten = TRUE)
+# new_data <- response$response$docs
+# numb_data <- response$response$numFound
+# 
+# # This is now matching up (using grepl) the leftover RED prog IDs, because the API loses this (they are buried in the iati_identifier)
+# 
+# results <- character(nrow(new_data))
+# 
+# for (activity in leftovers) {
+#   results[grepl(activity, new_data$iati_identifier)] <- paste0(results[grepl(activity, new_data$iati_identifier)], activity, collapse = NULL)
+# }
+# new_data$RED_activity <- results
+# new_data <- new_data %>% select(!c(participating_org_crs_channel_code,participating_org_narrative_xml_lang))
+# 
+# RED_data <- rbind(new_data_edit_red, new_data)
+```
+
+```{r}
+
+# I had a bit of trouble getting all the information through the API, so I've saved the initial API search for all the RED programmes
+# Can then read this file back in to search the API for the partner data
+
+RED_data <- readRDS("Outputs/RED_data_funder_060423.rds")
+
+# define a function to match up elements of the list between the IATI ID and the name of the partner
+
+my_func <- function(id, x, y) {
+  data.frame(id = id, result = paste(x, y, sep = ";"))
+}
+
+result <- mapply(my_func, RED_data$iati_identifier, RED_data$participating_org_ref, RED_data$participating_org_narrative, SIMPLIFY = FALSE)
+result_df <- do.call(rbind, result)
+
+# this produces a data frame for IATI ref and narrative
+result_df <- separate(result_df, col = "result", into = c("org_ref","org_narrative"), sep = ";")
+
+REDprogs <- read.xlsx("C:/Users/KimPrior/OneDrive - FCDO/Documents/RED bits/Management Info/RED_programmes_all_March2023.xlsx", sheet = "allRED")
+
+activity_id <- unique(c(REDprogs$Programme.ID))
+
+activity_id_char <- as.character(activity_id)
+results <- character(nrow(result_df))
+
+for (activity in activity_id_char) {
+  results[grepl(activity, result_df$id)] <- paste0(results[grepl(activity, result_df$id)], activity, collapse = NULL)
+}
+
+# This is a list of the partners listed for each component on IATI
+result_df$prog_no <- results
+rm(result)
+
+# Comparing the list of programmes that have a delivery name/ID on IATI, versus the list of programmes RED sent me
+# Programmes with partner named on IATI
+length(unique(result_df$prog_no))#99
+# Total number of RED programmes
+length(activity_id_char)#111
+# Programmes with no partner on IATI
+length(activity_id_char[!activity_id_char %in% unique(result_df$prog_no)])#12
+
+partner_orgs <- c(unlist(RED_data$participating_org_ref))
+partner_orgs <- unique(partner_orgs)
+partner_orgs <- gsub("GB-GOV-1","", partner_orgs)
+partner_orgs <- gsub("46004","XM-DAC-46004", partner_orgs)
+partner_orgs <- gsub("41122","XM-DAC-41122", partner_orgs)
+partner_orgs <- unique(partner_orgs)
+partner_orgs <- partner_orgs[nzchar(partner_orgs)]
+```
+
+
+```{r API call 1 - all RED partners but only 10 rows per partner}
+#takes a vector of character strings (e.g. "GB-GOV-1-203067"), and returns one thing with %22 added before and 
+#after each character string
+
+make_qstring <- function(iati_name) {
+  a <- sapply(iati_name, function(x){
+    paste0("%22",x,"%22")
+  })
+  paste0("q=reporting_org_ref:(",paste(a, collapse = " "),")")
+}
+
+# now i'm trying to loop through each org but just return the top 10 rows each time. should work because i have 98 orgs
+data_list <- list()
+numb_list <- numeric()
+
+for(i in partner_orgs){
+  print(paste0("Processing ", i))
+  path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
+                 make_qstring(i),
+                 '&rows=10',
+                 '&wt=json',
+                 "&fl=iati_identifier,other_identifier*,activity_date*,reporting_org*,hierarchy*, sector_code*,title*,description*,recipient_country_code,default_flow_type*,policy_marker*,transaction*,budget*,location*,activity_status*,participating_org*,related_activity*,tag*")
+  request <- GET(url = path, authentication)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE)
+  data_list <- c(data_list, list(response$response$docs))
+  num <- response$response$numFound
+  numb_list <- c(numb_list, ifelse(length(num)==0, NA, num))
+}
+
+combined_data <- bind_rows(data_list)
+
+```
+
+```{r API call 2 - only FCDO linked partners but all activities}
+data_list <- list()
+numb_list <- numeric()
+
+for(i in partner_orgs){
+  print(paste0("Processing ", i))
+  path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
+                 make_qstring(i),
+                 'AND (participating_org_ref:("GB-GOV-1" "GB-1"))',
+                 '&rows=1000',
+                 '&wt=json',
+                 "&fl=iati_identifier,other_identifier*,activity_date*,reporting_org*,hierarchy*, sector_code*,title*,description*,recipient_country_code,default_flow_type*,policy_marker*,transaction*,budget*,location*,activity_status*,participating_org*,related_activity*,tag*")
+  request <- GET(url = path, authentication)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE)
+  data_list <- c(data_list, list(response$response$docs))
+  num <- response$response$numFound
+  numb_list <- c(numb_list, ifelse(length(num)==0, NA, num))
+}
+
+GB_GOV_combined_data <- bind_rows(data_list)
+
+
+```
+
+```{r Assessing the partners}
+
+# The following partners have linked back to the FCDO/DFID
+linked_partners <- unique(GB_GOV_combined_data$reporting_org_ref)#53
+
+# Partners not reporting to IATI
+non_reporters <- partner_orgs[!partner_orgs %in% c(unique(combined_data$reporting_org_ref))]#39 either not registered, or signed up but no activities (do we need to distinguish these?)
+
+# Partners reporting title/description
+RED_list_unnest_1 <- combined_data %>%
+  select(reporting_org_ref, title_narrative, description_narrative) %>%
+  mutate()
+title_description_api1 <- unique(RED_list_unnest_1$reporting_org_ref)
+
+# Partners reporting recipient country
+RED_list_unnest_2 <- combined_data %>%
+  # title
+  unnest(cols = recipient_country_code)  %>% 
+  select(reporting_org_ref, recipient_country_code) %>% 
+  unique() %>% 
+  group_by(reporting_org_ref) %>%
+  summarise(recipient_country = paste(coalesce(recipient_country_code, ""), collapse = ", ")) %>% 
+  ungroup()
+recip_country_api1 <- unique(RED_list_unnest_2$reporting_org_ref)
+
+# Partners reporting participating org
+RED_list_unnest_3 <- combined_data %>%
+  # title
+  unnest(cols = participating_org_narrative)  %>% 
+  select(reporting_org_ref, participating_org_narrative) %>% 
+  unique() %>% 
+  group_by(reporting_org_ref) %>%
+  summarise(participating_org_narrative = paste(coalesce(participating_org_narrative, ""), collapse = ", ")) %>% 
+  ungroup()
+participating_org_api1 <- unique(RED_list_unnest_3$reporting_org_ref)
+
+# Partners reporting budget
+RED_list_unnest_4 <- combined_data %>%
+  # title
+  unnest(cols = budget_value)  %>% 
+  select(reporting_org_ref,
+         budget_value,
+         budget_period_start_iso_date,
+         budget_period_end_iso_date) %>%
+  group_by(reporting_org_ref)
+
+budgets_api1 <- unique(RED_list_unnest_4$reporting_org_ref)
+
+# Partners reporting start/end dates
+RED_list_unnest_5 <- combined_data %>%
+  select(reporting_org_ref, activity_date_iso_date) %>%
+  group_by(reporting_org_ref)
+
+start_end_api1 <- unique(RED_list_unnest_5$reporting_org_ref)
+
+rm(RED_list_unnest_1,RED_list_unnest_2,RED_list_unnest_3,RED_list_unnest_4,RED_list_unnest_5)
+
+green <- Reduce(intersect, list(title_description_api1,recip_country_api1,participating_org_api1,budgets_api1,start_end_api1))
+
+all <- unique(c(title_description_api1,recip_country_api1,participating_org_api1,budgets_api1,start_end_api1))
+
+amber <- all[!all %in% green]
+
+```
+
+```{r mapping to RED programmes}
+result_df$org_ref <- gsub("46004","XM-DAC-46004", result_df$org_ref)
+result_df$org_ref <- gsub("41122","XM-DAC-41122", result_df$org_ref)
+
+partner_result_df <- result_df[result_df$org_ref != "GB-GOV-1",]
+
+linked_df <- data.frame(org_ref = c(linked_partners), FCDO_linked = "Yes")
+green_df <- data.frame(org_ref = c(green), RAG = "Green")
+amber_df <- data.frame(org_ref = c(amber), RAG = "Amber")
+
+partner_result_df <- merge(partner_result_df, green_df, by = "org_ref", all.x = TRUE)
+partner_result_df <- merge(partner_result_df, amber_df, by = "org_ref", all.x = TRUE)
+partner_result_df <- merge(partner_result_df, linked_df, by = "org_ref", all.x = TRUE)
+
+partner_result_df$RAG.x <- ifelse(is.na(partner_result_df$RAG.x), "", partner_result_df$RAG.x)
+partner_result_df$RAG.y <- ifelse(is.na(partner_result_df$RAG.y), "", partner_result_df$RAG.y)
+
+partner_result_df$RAG_all <- paste(partner_result_df$RAG.x,partner_result_df$RAG.y)
+
+partner_result_df <- select(partner_result_df, -RAG.x, -RAG.y)
+
+write.xlsx(partner_result_df, "Outputs/RED_IATIpartner_results_100423.xlsx")
+
+```
+
+```{r accessing transaction detail}
+path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+                 'q=iati_identifier:GB-HESA-10004113-300123-101',
+                 '&wt=json',
+                 '&rows=100',
+                 "&fl=transaction_description_narrative,transaction_provider_org_ref,transaction_recipient_country_code,transaction_provider_org_provider_activity_id")
+request <- GET(url = path, authentication)
+message(request$status_code)
+response <- content(request, as = "text", encoding = "UTF-8")
+response <- fromJSON(response, flatten = TRUE)
+new_data <- response$response$docs
+numb_data <- response$response$numFound
+
+
+path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+                 'q=iati_identifier:GB-HESA-10004113-300123-101',
+                 '&wt=json',
+                 '&rows=100',
+                 "&fl=transaction_description_narrative,transaction_provider*,transaction_recipient*,receiver_organisation_narrative,transaction_recipient_org_narrative")
+request <- GET(url = path, authentication)
+message(request$status_code)
+response <- content(request, as = "text", encoding = "UTF-8")
+response <- fromJSON(response, flatten = TRUE)
+new_data <- response$response$docs
+numb_data <- response$response$numFound
+
+```
+
+```{r }
+
+transactions_RED_extract <- function(page, activity_batch) {
+  
+  # Reformat ID if it contains spaces (for API)
+  rows = 1000
+  start <- (page - 1) * rows
+  path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+                 'q=transaction_provider_org_provider_activity_id:',
+                 activity_batch,
+                 '&wt=json',
+                 '&rows=',rows,
+                 '&start=',start,
+                 "&fl=iati_identifier,transaction_provider_org_provider_activity_id")
+  request <- GET(url = path, authentication)
+  message(request$status_code)
+  response <- content(request, as = "text", encoding = "UTF-8")
+  response <- fromJSON(response, flatten = TRUE) 
+  new_data <- response$response$docs
+  numb_data <- response$response$numFound
+  
+  if(start >= numb_data){
+    return(NULL)
+  } 
+  
+  return(new_data)
+}
+
+RED_transaction_extract <- function(o_code) {
+  page_list <- list()
+  page <- 1
+  page_df = data.frame()
+  
+  while (!is.null(page_df)) {
+    Sys.sleep(1)
+    message(page)
+    page_df <- transactions_RED_extract(page, o_code)
+    if(!is.null(page_df)){
+      page_list[[page]] = page_df
+    }
+    page = page + 1
+  }
+  rbindlist(page_list, fill=T)
+}
+
+RED_activity_ids = unique(RED_data$iati_identifier)
+
+batch_size = 10
+batches = c()
+current_batch = c()
+for(i in 1:length(RED_activity_ids)){
+  current_id = RED_activity_ids[i]
+  if(i %% batch_size == 0){
+    current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+    batches = c(batches, current_batch_str)
+    current_batch = c(current_id)
+  } else {
+    current_batch = c(current_batch, current_id)
+  }
+}
+
+REDs_transaction_extract <- lapply(batches, RED_transaction_extract)
+REDs_transaction_extract = rbindlist(REDs_transaction_extract, fill=T)
+
+REDs_transaction_extract$transaction_provider_org_provider_activity_id <- as.character(REDs_transaction_extract$transaction_provider_org_provider_activity_id)
+
+
+# 3) Keep partner activity IDs only (not duplicate gov funder ones) ----
+
+RED_linked_activites <- REDs_transaction_extract %>% 
+  filter(iati_identifier != transaction_provider_org_provider_activity_id) %>% 
+  unique() %>% rename(activity_id = transaction_provider_org_provider_activity_id)
+
+
+RED_list <- as.data.frame(unique(RED_linked_activites$activity_id))
+
+FCDO_RED_list <- RED_data %>% 
+  select(iati_identifier, participating_org_ref, participating_org_role) %>%
+  unnest(c(participating_org_ref,participating_org_role)) %>%
+  filter(participating_org_role == "4") %>%
+  select(-participating_org_role) %>%
+  unique()
+
+
+write.xlsx(as.data.frame(RED_linked_activites),"Outputs/RED_linked_activities.xlsx")
+write.xlsx(FCDO_RED_list,"Outputs/FCDO_RED_list.xlsx")
+write.xlsx(ri_linked_activites,"Outputs/ri_linked_activites.xlsx")
+
+```

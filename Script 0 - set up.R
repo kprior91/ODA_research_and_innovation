@@ -1,7 +1,7 @@
 
 ### Set end of quarter data for update ----
 
-quarter_end_date <- as.Date("2021-12-31")
+quarter_end_date <- as.Date("2022-12-31")
 
 
 ### Check and install packages ----
