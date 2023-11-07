@@ -4,7 +4,7 @@
 # --------------------------------------------------------------- #
 
 # Read in collated dataset from previous script
-all_projects_tidied <- readRDS("Outputs/all_projects_tidied_kp_1907.rds")
+all_projects_tidied <- readRDS("Outputs/all_projects_tidied_kp_2607.rds")
 org_names_and_locations <- readRDS("Outputs/org_names_and_locations_kp.rds")
 
 # Connect to ODA RI Projects database on development server
@@ -49,7 +49,7 @@ duplicates <- project_table %>%
 # remove duplicate rows (rough)
 project_table <- project_table[!duplicated(project_table$project_id), ] 
 
-saveRDS(project_table, file = "Outputs/project_table_kp.rds")
+saveRDS(project_table, file = "Outputs/project_table_kp_2607.rds")
 
 
 # 2) Create funder table ----
@@ -59,7 +59,7 @@ funder_table <- all_projects_tidied %>%
          fund = Fund, cofunder = `Co-Funder`, funder_iati_id = iati_id) %>% 
   unique()
 
-saveRDS(funder_table, file = "Outputs/funder_table_kp.rds")
+saveRDS(funder_table, file = "Outputs/funder_table_kp_2607.rds")
 
 
 # 3) Create organisation table ----

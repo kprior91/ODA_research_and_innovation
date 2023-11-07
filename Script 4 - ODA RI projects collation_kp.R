@@ -17,7 +17,7 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1.r
 # Read in list of IATI activities (from UK gov funders and select delivery partners)
 # gov_iati_list <- readRDS(file = "Outputs/gov_list_final_kp.rds")
 gov_list_final_red <- readRDS(file = "Outputs/gov_list_final_red.rds")
-activity_list <- readRDS(file = "Outputs/partner_activity_list_kp.rds")
+activity_list <- readRDS(file = "Outputs/partner_activity_list_kp_oct23.rds")
 gov_non_iati_ids <- paste0(gov_non_iati_programmes$iati_identifier, collapse = "|")
 
 # gov_non_iati_programmes <- RED_list_final[is.na(RED_list_final$recipient_country_region)]
@@ -36,26 +36,31 @@ gov_non_iati_ids <- paste0(gov_non_iati_programmes$iati_identifier, collapse = "
 # I'm now exploring how i can keep some of the FCDO activities that are incorrectly (i think) getting filtered out with the above code
 iati_projects <- gov_list_final_red %>%
   filter(!iati_identifier %in% ri_linked_activites$activity_id) %>%
-  filter(str_detect(iati_identifier, "GB-1-|GB-GOV-1-|GB-GOV-3|GB-GOV-7") |     # include ex-FCO and Defra activities
-           str_detect(iati_identifier, gov_non_iati_ids)         # keep FCDO/DHSC programmes funding out of scope of IATI
-  ) %>%
+  filter(str_detect(iati_identifier, "GB-1-|GB-GOV-1-|GB-GOV-3|GB-GOV-7")) %>%
   mutate(fund = if_else(is.na(fund), "Unknown", fund)) %>% 
   plyr::rbind.fill(activity_list) # Add partner activities
 
 # Identify UKRI projects (by "RI" IATI tag)
+ukri_iati_projects <- gov_list_final_red %>% 
+  filter(extending_org == "UK Research & Innovation") %>% 
+  mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>% 
+  mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>% 
+  mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
+  select(gtr_id, iati_identifier, recipient_country) %>% 
+  unique()
 
 # BEIS is has paused publishing UKRI data due to issues, hoping to republish in the next couple of weeks
 # this is temporary, was from a couple of months ago
-ukri_iati <- readxl::read_xlsx("Outputs/gov_list_final_kp_UKRI.xlsx", sheet=1, col_types = "text")
-
-ukri_iati_projects <- ukri_iati %>%
-  filter(extending_org == "UK Research & Innovation") %>%
-  mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>%
-  mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>%
-  mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
-  select(gtr_id, iati_identifier, recipient_country_region) %>%
-  rename(recipient_country = recipient_country_region) %>%
-  unique()
+# ukri_iati <- readxl::read_xlsx("Outputs/gov_list_final_kp_UKRI.xlsx", sheet=1, col_types = "text")
+# 
+# ukri_iati_projects <- ukri_iati %>%
+#   filter(extending_org == "UK Research & Innovation") %>%
+#   mutate(gtr_id = str_replace(iati_identifier, "GB-GOV-13-FUND--GCRF-", "")) %>%
+#   mutate(gtr_id = str_replace(gtr_id, "GB-GOV-13-FUND--Newton-", "")) %>%
+#   mutate(gtr_id = str_replace_all(gtr_id, "_", "/")) %>%
+#   select(gtr_id, iati_identifier, recipient_country_region) %>%
+#   rename(recipient_country = recipient_country_region) %>%
+#   unique()
 
 
 # Add on beneficiary countries for FCDO non-IATI programmes
@@ -174,65 +179,65 @@ for (id in ukri_projects_ids_full$gtr_id) {
 ukri_projects_by_id <- readRDS("Outputs/ukri_projects_by_id_kp.rds")
 
 # Save org names and countries to file
-saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2_kp.rds")
-# org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
+# saveRDS(org_names_and_locations_2, file = "Outputs/org_names_and_locations_2_kp.rds")
+org_names_and_locations_2 <- readRDS(file = "Outputs/org_names_and_locations_2.rds")
 
 
 # SECOND BATCH OF UKRI IDs
 # Dan Sparks gave me a list of IATI identifiers and GtR IDs so i can get this from the database (see below)
 
-ukri_iati_DS <- readxl::read_xlsx("Inputs/UKRI Published activities.xlsx", sheet=1, col_types = "text")
-ukri_iati_DS$`Grant reference` <- trimws(ukri_iati_DS$`Grant reference`, whitespace = "[\\h\\v]")
-
-ukri_iati_DS_by_fund <- ukri_iati_DS %>%
-  mutate(Fund = case_when(
-    str_detect(`iati-identifier`, "GCRF") ~ "DSIT - Global Challenges Research Fund (GCRF)",
-    str_detect(`iati-identifier`, "Newton") ~ "DSIT - Newton Fund",
-    TRUE ~ "Other"
-  ),
-  Funder = "Department for Science, Innovation and Technology") %>%
-  filter(!`Grant reference` %in% ukri_projects_ids_full$gtr_id)
-
-ukri_iati_DS_by_fund$`Grant reference` <- trimws(ukri_iati_DS_by_fund$`Grant reference`, whitespace = "[\\h\\v]")
+# ukri_iati_DS <- readxl::read_xlsx("Inputs/UKRI Published activities.xlsx", sheet=1, col_types = "text")
+# ukri_iati_DS$`Grant reference` <- trimws(ukri_iati_DS$`Grant reference`, whitespace = "[\\h\\v]")
+# 
+# ukri_iati_DS_by_fund <- ukri_iati_DS %>%
+#   mutate(Fund = case_when(
+#     str_detect(`iati-identifier`, "GCRF") ~ "DSIT - Global Challenges Research Fund (GCRF)",
+#     str_detect(`iati-identifier`, "Newton") ~ "DSIT - Newton Fund",
+#     TRUE ~ "Other"
+#   ),
+#   Funder = "Department for Science, Innovation and Technology") %>%
+#   filter(!`Grant reference` %in% ukri_projects_ids_full$gtr_id)
+# 
+# ukri_iati_DS_by_fund$`Grant reference` <- trimws(ukri_iati_DS_by_fund$`Grant reference`, whitespace = "[\\h\\v]")
 
 
 # Create empty dataset to hold projects
-DS_ukri_projects_by_id <- data.frame()
-DS_org_names_and_locations_2 <- data.frame()
+# DS_ukri_projects_by_id <- data.frame()
+# DS_org_names_and_locations_2 <- data.frame()
 
 # Run project info extraction over all GtR projects
 # (takes 1-2 hours to run)
 
-n <- 1 # set counter
-
-for (id in ukri_iati_DS_by_fund$`Grant reference`) {
-  
-  print(paste0(n, " - ", id))
-  
-  data <- extract_ukri_projects_by_id(id)
-  
-  # Separate elements of list
-  project_data <- data[[1]]
-  org_data <- data[[2]]
-  
-  # Add new data rows to existing tables
-  DS_ukri_projects_by_id <- DS_ukri_projects_by_id %>% 
-    rbind(project_data)
-  
-  DS_org_names_and_locations_2 <- DS_org_names_and_locations_2 %>% 
-    rbind(org_data)
-  
-  # Increment counter for next cycle
-  n <- n+1
-  
-}
+# n <- 1 # set counter
+# 
+# for (id in ukri_iati_DS_by_fund$`Grant reference`) {
+#   
+#   print(paste0(n, " - ", id))
+#   
+#   data <- extract_ukri_projects_by_id(id)
+#   
+#   # Separate elements of list
+#   project_data <- data[[1]]
+#   org_data <- data[[2]]
+#   
+#   # Add new data rows to existing tables
+#   DS_ukri_projects_by_id <- DS_ukri_projects_by_id %>% 
+#     rbind(project_data)
+#   
+#   DS_org_names_and_locations_2 <- DS_org_names_and_locations_2 %>% 
+#     rbind(org_data)
+#   
+#   # Increment counter for next cycle
+#   n <- n+1
+#   
+# }
 
 # saveRDS(DS_ukri_projects_by_id, file = "Outputs/DS_ukri_projects_by_id_kp.rds")
-DS_ukri_projects_by_id <- readRDS("Outputs/DS_ukri_projects_by_id_kp.rds")
+# DS_ukri_projects_by_id <- readRDS("Outputs/DS_ukri_projects_by_id_kp.rds")
 
 # Save org names and countries to file
 # saveRDS(DS_org_names_and_locations_2, file = "Outputs/DS_org_names_and_locations_2_kp.rds")
-DS_org_names_and_locations_2 <- readRDS(file = "Outputs/DS_org_names_and_locations_2.rds")
+# DS_org_names_and_locations_2 <- readRDS(file = "Outputs/DS_org_names_and_locations_2_kp.rds")
 
 
 ### C - Add on fund and funder labels
@@ -242,9 +247,9 @@ ukri_projects_by_id_with_id <- ukri_projects_by_id %>%
   left_join(select(ukri_projects_ids_full, 
                    iati_id = iati_identifier, Fund, Funder, gtr_id), by = "gtr_id") 
 
-DS_ukri_projects_by_id_with_id <- DS_ukri_projects_by_id %>% 
-  left_join(select(ukri_iati_DS_by_fund, 
-                   iati_id = `iati-identifier`, Fund, Funder, gtr_id = `Grant reference`), by = "gtr_id") 
+# DS_ukri_projects_by_id_with_id <- DS_ukri_projects_by_id %>% 
+#   left_join(select(ukri_iati_DS_by_fund, 
+#                    iati_id = `iati-identifier`, Fund, Funder, gtr_id = `Grant reference`), by = "gtr_id") 
 
 
 # See which awards from input list have not been found
@@ -259,7 +264,7 @@ missing_awards <- select(ukri_projects_ids_full, gtr_id) %>%
 #   unique()
 
 # r bind the 2 UKRI datasets
-ukri_projects_by_id_with_id <- rbind(ukri_projects_by_id_with_id, DS_ukri_projects_by_id_with_id)
+# ukri_projects_by_id_with_id <- rbind(ukri_projects_by_id_with_id, DS_ukri_projects_by_id_with_id)
 
 # Convert all factor fields to character
 
@@ -457,6 +462,8 @@ org_names_and_locations_3 <- nihr_projects_final %>%
                                  organisation_role = 2))
 
 
+# saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3_kp.rds")
+
 # Save as R file (to read back in if needed)
 # saveRDS(nihr_projects_final, file = "Outputs/nihr_projects_final_kp.rds")
 nihr_projects_final <- readRDS("Outputs/nihr_projects_final_kp.rds")
@@ -549,6 +556,8 @@ org_names_and_locations_3 <- org_names_and_locations_3 %>%
                organisation_country = partner_org_country) %>% 
           mutate(organisation_role = 2))
 
+# saveRDS(org_names_and_locations_3, file = "Outputs/org_names_and_locations_3_kp.rds")
+
 
 # Clear environment
 rm(wellcome_grants, wellcome_grants_formatted, wellcome_partners)
@@ -561,60 +570,60 @@ rm(wellcome_grants, wellcome_grants_formatted, wellcome_partners)
 # This has not yet been sent to us
 
 # Reformat to match other dataset
-dhsc_ghs_projects_final <- dhsc_ghs_projects %>% 
-  rename(id = `Extending organisation - award ID`,
-         title = `Award title`,
-         abstract = `Award description`,
-         start_date = `Start date`,
-         end_date = `End date`,
-         amount = `Award amount (£)`,
-         recipient_country = `Beneficiary country`,
-         extending_org = `Extending organisation - name`,
-         lead_org_name = `Lead organisation - name`,
-         lead_org_country = `Lead organisation - country`,
-         partner_org_name = `Implementing partner(s) - name`,
-         partner_org_country = `Implementing partner(s) - country`,
-         iati_id = `Funder programme - IATI ID`,
-         link = `Data source`
-         ) %>% 
-  mutate(start_date = as.character(start_date),
-         end_date = as.character(end_date),
-         currency = coalesce(Currency, "GBP"),
-         period_start = NA_character_,
-         period_end = NA_character_,
-         subject = NA_character_,
-         status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
-         last_updated = quarter_end_date
-         ) %>% 
-  select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`)
+# dhsc_ghs_projects_final <- dhsc_ghs_projects %>% 
+#   rename(id = `Extending organisation - award ID`,
+#          title = `Award title`,
+#          abstract = `Award description`,
+#          start_date = `Start date`,
+#          end_date = `End date`,
+#          amount = `Award amount (£)`,
+#          recipient_country = `Beneficiary country`,
+#          extending_org = `Extending organisation - name`,
+#          lead_org_name = `Lead organisation - name`,
+#          lead_org_country = `Lead organisation - country`,
+#          partner_org_name = `Implementing partner(s) - name`,
+#          partner_org_country = `Implementing partner(s) - country`,
+#          iati_id = `Funder programme - IATI ID`,
+#          link = `Data source`
+#          ) %>% 
+#   mutate(start_date = as.character(start_date),
+#          end_date = as.character(end_date),
+#          currency = coalesce(Currency, "GBP"),
+#          period_start = NA_character_,
+#          period_end = NA_character_,
+#          subject = NA_character_,
+#          status = coalesce(if_else(end_date >= Sys.Date(), "Active", "Closed"), "Unknown"),
+#          last_updated = quarter_end_date
+#          ) %>% 
+#   select(-`No.`, -Currency, -`Aims/Objectives`, -`Investigator(s) - name`)
 
 
 # Save as R file (to read back in if needed)
 # saveRDS(dhsc_ghs_projects_final, file = "Outputs/dhsc_ghs_projects_final_kp.rds")
-dhsc_ghs_projects_final <- readRDS("Outputs/dhsc_ghs_projects_final_kp.rds") 
+# dhsc_ghs_projects_final <- readRDS("Outputs/dhsc_ghs_projects_final_kp.rds") 
 
 # Write lead org names and countries to file
-org_names_and_locations_3 <- org_names_and_locations_3 %>% 
-  rbind(select(dhsc_ghs_projects_final,
-               project_id = id,
-               organisation_name = lead_org_name,
-               organisation_country = lead_org_country) %>% 
-          mutate(organisation_role = 1))
-
-# Write partner org names and countries to file (where simple to do)
-dhsc_partners <- dhsc_ghs_projects_final %>% 
-  select(id, partner_org_name, partner_org_country) %>% 
-  # Exclude missings, multiple and miscellaneous partners
-  filter(!is.na(partner_org_name),
-         !str_detect(partner_org_name, ",|;"),
-         !str_detect(partner_org_country, ",|;|N/A")) 
-
-org_names_and_locations_3 <- org_names_and_locations_3 %>% 
-  rbind(select(dhsc_partners,
-               project_id = id,
-               organisation_name = partner_org_name,
-               organisation_country = partner_org_country) %>% 
-          mutate(organisation_role = 2))
+# org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+#   rbind(select(dhsc_ghs_projects_final,
+#                project_id = id,
+#                organisation_name = lead_org_name,
+#                organisation_country = lead_org_country) %>% 
+#           mutate(organisation_role = 1))
+# 
+# # Write partner org names and countries to file (where simple to do)
+# dhsc_partners <- dhsc_ghs_projects_final %>% 
+#   select(id, partner_org_name, partner_org_country) %>% 
+#   # Exclude missings, multiple and miscellaneous partners
+#   filter(!is.na(partner_org_name),
+#          !str_detect(partner_org_name, ",|;"),
+#          !str_detect(partner_org_country, ",|;|N/A")) 
+# 
+# org_names_and_locations_3 <- org_names_and_locations_3 %>% 
+#   rbind(select(dhsc_partners,
+#                project_id = id,
+#                organisation_name = partner_org_name,
+#                organisation_country = partner_org_country) %>% 
+#           mutate(organisation_role = 2))
 
 # Clear environment
 rm(dhsc_ghs_projects, dhsc_partners)
@@ -800,7 +809,11 @@ all_projects_tidied <- all_projects_tidied %>%
 # (linked partner data from non-RED managed programmes)
 all_projects_tidied <- all_projects_tidied %>% 
   filter(!(extending_org %in% c("Sightsavers",
-                                "Coffey International Development Limited, a Tetra Tech Company")))
+                                "Coffey International Development Limited, a Tetra Tech Company",
+                                "SIGHTSAVERS")))
+
+all_projects_tidied <- all_projects_tidied %>% 
+  filter(!(Funder %in% c("The Institute of Development Studies")))
 
 # Correct missing IDS name (ARPA activity)
 all_projects_tidied <- all_projects_tidied %>% 
@@ -820,11 +833,107 @@ DHSC_cofund <- DHSC_cofund %>% rename(id = `DHSC - MRC co-funded awards`)
 all_projects_tidied <- all_projects_tidied %>% mutate(`Co-Funder` = "", .after=Funder)
 all_projects_tidied$`Co-Funder` <- ifelse(all_projects_tidied$id %in% c(DHSC_cofund$id), "DHSC", all_projects_tidied$`Co-Funder`)
 
+# Some data cleaning - partner org name
+
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="UK - Medical Research Council, Correction","UK - Medical Research Council", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Correction","", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Pegasys Limited, Correction","Pegasys Limited", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Supplier Name Excluded","", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="ACTIONAID MYANMAR, Correction","ACTIONAID MYANMAR", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name %in% c("Oxford University, Correction", "University of Oxford, Supplier Name Excluded","Oxford University","Oxford University, Customer, Correction"),"University of Oxford", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Supplier Name Excluded, Correction","", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name %in% c("The GSMA Foundation, Correction","The GSMA Foundation, Journal Transaction"),"The GSMA Foundation", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name %in% c("Abt Associates Inc, Correction","Abt Associates Inc, Supplier Name Excluded"),"Abt Associates Inc", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name %in% c("London School of Hygiene and Tropical Medicine, Customer, Correction","London School of Hygiene and Tropical Medicine, Journal Transaction"),"London School of Hygiene and Tropical Medicine", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Asian Development Bank, Supplier Name Excluded","Asian Development Bank", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Supplier Name Excluded, Bi Valve Shelfish Association of SA (Pty) Ltd","Bi Valve Shelfish Association of SA (Pty) Ltd", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name %in% c("Chemonics International Inc., Supplier Name Excluded","Chemonics International Inc., Supplier Name Excluded, Journal Transaction"),"Chemonics International Inc.", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="IORA Ecological Soluations Pvt Ltd","IORA Ecological Solutions Pvt Ltd", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Supplier Name Excluded, Journal Transaction, Yale University","Yale University", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="School of Oriental and African Studies (SOAS), Journal Transaction","School of Oriental and African Studies (SOAS)", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Global Disability Innovation Hub, Correction","Global Disability Innovation Hub", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="University of Manchester Research, Journal Transaction","University of Manchester Research", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="Cowatersogema International Inc, Journal Transaction","Cowatersogema International Inc", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="IMC Worldwide, Journal Transaction, Customer","IMC Worldwide", all_projects_tidied$partner_org_name)
+all_projects_tidied$partner_org_name <- ifelse(all_projects_tidied$partner_org_name=="International Rescue Committee (UK), Supplier Name Excluded","International Rescue Committee (UK)", all_projects_tidied$partner_org_name)
+
+
+
+
+
+# More data cleaning - partner org country
+
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="University of Montpellier 3 Paul Valery", "France", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Institute of Labor Economics", "Germany", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="University of Manchester Research", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="University of Oxford", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Shell Foundation", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Crown Agents Bank", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Pegasys Limited", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Global Innovation Fund", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="UK - Medical Research Council", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Path", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="ACTIONAID MYANMAR", "Myanmar", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Bi Valve Shelfish Association of SA (Pty) Ltd", "South Africa", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Mott MacDonald Limited", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Dentons UK and Middle East LLP", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Chemonics International Inc.", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name %in% c("IORA Ecological Solutions Pvt Ltd","IORA"), "India", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="KBR", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="School of Oriental and African Studies (SOAS)", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Global Disability Innovation Hub", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Centre for Agriculture and Bioscience International", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Results for Development", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="J-PAL", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="The GSMA Foundation", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="IMC Worldwide", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="London School of Hygiene and Tropical Medicine", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Cowatersogema International Inc", "Canada", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Global Integrity", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Abt Associates Inc", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="International Rescue Committee (UK)", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="MannionDaniels", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="UNESCO IIEP", "France", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Malcolm H. Kerr Carnegie Middle East Center, Rift Valley Institute, The Asia Foundation", "Lebanon, Kenya, United States of America (the)", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Brink Innovation Ltd, IMC Worldwide LTD", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Johns Hopkins University, Insecurity Insight, University of Geneva, Bikash Shrot Kendra, Aga Khan Foundation, Central African Institute of Statistics, Economic and Social Studies (ICASEES)", "United States of America (the), Switzerland, Nepal, Central African Republic", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Busara Center for Behavioral Economics, 60 Decibels, Acumen Resilient Agriculture Fund", "Kenya, United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="PAK GIRL GUIDES, **********, International Labour Organization (ILO)", "Pakistan", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Centre for Economic Policy Research, The University of Oxford, The University of Groningen, African Center for Economic Transformation (ACET), The University of Notre Dame, The Yale Research Initiative on Innovation and Scale", "United Kingdom of Great Britain and Northern Ireland (the), United States of America (the), Ghana", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Crop2Cash", "Nigeria", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="J-Palm", "Liberia", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Green Agro - Lersha", "Ethiopia", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Benaa Foundation", "Egypt", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Bakhabar Kissan", "Pakistan", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Simusolar", "Tanzania", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Hello Tractor", "Nigeria", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Geokrishi", "Nepal", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Komunidad", "Philippines (the)", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="CoAmana", "Nigeria", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Aquarech", "Kenya", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Diyalo", "Nepal", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Bhumijo", "Bangladesh", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Swacch Sustainable Solutions", "India", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="The Freetown Waste Transformers", "Sierra Leone", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Janajal - Supremus", "India", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Powerstove", "Nigeria", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="The University of Oxford, Centre for Ecnomic and Social Studies, Young Lives India, Pankhurt Deveopment Research and Consulting PLC, Policy Studies Institute, Grupo de Analisis para el Desarollo, Centre for Analysis and Forecasting, Vietnamese Academy of Social Sciences, General Statistics Office, Ministry of Planning and Investment, University of Lancaster", "United Kingdom of Great Britain and Northern Ireland (the), India, Vietnam, Peru", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="HERD international, American University of Beirut, Queen Margaret University, UK, Macfarlane Burnet Institute for Medical Research and Public Health Ltd, College of Medicine and Allied Health Sciences", "Nepal, Lebanon, United Kingdom, Australia, Sierra Leone", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Malawi Liverpool Wellcome Trust Programme, Malawi, Makerere University School of Public Health, Liverpool School of Tropical Medicine, African Institute for Development Policy (AFIDEP), Kenya, Zankli Research Centre, London School of Hygiene & Tropical Medicine, Respiratory Society of Kenya", "Malawi, Uganda, Kenya, Nigeria, United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="International Water Management Institute (IWMI)", "Sri Lanka", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="International Rice Research Institute (IRRI)", "Philippines (the)", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="International Food Policy Research institute (IFPRI)", "United States", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Land O'Lakes Venture37, PricewaterhouseCoopers TZ", "United States, Tanzania", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="GALVMED", "United Kingdom", all_projects_tidied$partner_org_country)
+all_projects_tidied$partner_org_country <- ifelse(all_projects_tidied$partner_org_name=="Connexus", "Australia", all_projects_tidied$partner_org_country)
+
+
+
 # 9) Save datasets -------------------------------------------
 
-saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied_kp_1907.rds")
+saveRDS(all_projects_tidied, file = "Outputs/all_projects_tidied_kp_2607.rds")
 # all_projects_tidied <- readRDS("Outputs/all_projects_tidied_kp.rds")
-write.xlsx(all_projects_tidied, file = "Outputs/all_projects_tidied_kp_1907.xlsx")
+write.xlsx(all_projects_tidied, file = "Outputs/all_projects_tidied_kp_2607.xlsx")
 
 
 # Save org names and countries to file
@@ -835,7 +944,7 @@ org_names_and_locations <- rbind(org_names_and_locations_1, DS_org_names_and_loc
   unique()
 
 saveRDS(org_names_and_locations, file = "Outputs/org_names_and_locations_kp.rds")
-#write.xlsx(org_names_and_locations, file = "Outputs/org_names_and_locations_kp.xlsx")
+# write.xlsx(org_names_and_locations, file = "Outputs/org_names_and_locations_kp.xlsx")
 
 
 # Clear environment

@@ -4,7 +4,7 @@
 # UK government departments' IATI data 
 # --------------------------------------------------------------- #
 
-# 1) Extract list of OECD research sector codes from IATI ------
+# 1) Filter the OECD research sector codes from the sector list ------
 
 
 # Keep research/innovation/tech codes only (11)
@@ -25,8 +25,14 @@ organisation_codes <- c("GB-GOV-1",  # FCDO
                         "GB-GOV-15", # DIT
                         "GB-GOV-50") # Prosperity Fund
 
-#organisation_codes <- c("GB-GOV-7")
-
+# organisation_codes <- c("GB-GOV-13","GB-GOV-7")
+# 
+# organisation_codes <- c("GB-GOV-7",  # Defra
+#                         "GB-GOV-10", # DHSC
+#                         "GB-GOV-12", # DCMS
+#                         "GB-GOV-13", # BEIS
+#                         "GB-GOV-15", # DIT
+#                         "GB-GOV-50") # Prosperity Fund
 
 specific_org_extract <- function(o_code) {
   page_list <- list()
@@ -56,18 +62,19 @@ uk_gov_list_final = rbindlist(uk_gov_list_final, fill=T)
 # saveRDS(uk_gov_list_final, file = "Outputs/uk_gov_list_final_kp.rds")
 uk_gov_list_final <- readRDS(file = "Outputs/uk_gov_list_final_kp.rds")
 
+# FCDO_tagcode <- uk_gov_list_final %>% unnest(col = tag_code) %>% filter(reporting_org_ref == "GB-GOV-1", !is.na(tag_code)) %>% select(iati_identifier, tag_code, description_narrative)
+# write.xlsx(FCDO_tagcode, file = "C:/Users/KimPrior/OneDrive - FCDO/Documents/RED bits/Management Info/UKCDR Climate Tracker commission/FCDO_tagcode.xlsx")
 
 # 3) Filter to keep ODA R&I activities only ------
 # (via the IATI "RI" tag field eventually - not all gov departments use this yet)
 
 # Unnest tags
 uk_gov_ri_programmes <- uk_gov_list_final %>%
-  filter(lengths(tag_code) != 0) %>%
   unnest(col = tag_code)
 
 # Save list of tagged research & innovation activities
 ri_iati_activities <- uk_gov_ri_programmes %>% 
-  filter(tag_code == "RI") %>% 
+  filter(tag_code == "RI"|str_detect(title_narrative, "research|Research|CEPI")) %>% 
   select(iati_identifier) %>% 
   unique() %>% 
   mutate(tag_code = "RI")
@@ -83,10 +90,10 @@ uk_gov_list_filtered <- uk_gov_list_final %>%
   select(-tag_code) %>% 
   left_join(ri_iati_activities, by = "iati_identifier") %>% 
   filter((reporting_org_ref %in% c("GB-GOV-7", "GB-GOV-10", "GB-GOV-15", "GB-GOV-50") | # Include everything from these gov departments
-          str_detect(iati_identifier, "GB-GOV-3") |                               # Include everything ex-FCDO
+          str_detect(iati_identifier, "GB-GOV-3") |                               # Include everything ex-FCO
           !is.na(tag_code) |                                                      # Include tagged R&I programmes
-          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN")),   # Include BEIS Newton/GCRF and DHSC GHS/GHR activities
-          default_flow_type_code == "10" | is.na(default_flow_type_code))         # Restrict to ODA funding only
+          str_detect(iati_identifier, "NEWT|Newton|NF|GCRF|NIHR|GAMRIF|UKVN|OODA"))) %>%   # Include BEIS Newton/GCRF, as well as OODA and DHSC GHS/GHR activities
+  filter(default_flow_type_code == "10" | is.na(default_flow_type_code))        # Restrict to ODA funding only
 
 
 # 4) Unnest activity information -----------
@@ -435,8 +442,25 @@ specific_trans_extract_country <- function(id) {
 
 # specific_org_extract("GB-GOV-15")
 
-gov_transaction_list_countries <- lapply(unique(gov_list_final$iati_identifier), specific_trans_extract_country)
+uk_activity_ids = unique(gov_list_final$iati_identifier)
+
+batch_size = 15
+batches = c()
+current_batch = c()
+for(i in 1:length(uk_activity_ids)){
+  current_id = uk_activity_ids[i]
+  if(i %% batch_size == 0){
+    current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+    batches = c(batches, current_batch_str)
+    current_batch = c(current_id)
+  } else {
+    current_batch = c(current_batch, current_id)
+  }
+}
+
+gov_transaction_list_countries <- lapply(batches, specific_trans_extract_country)
 gov_transaction_list_countries = rbindlist(gov_transaction_list_countries, fill=T)
+
 
 # Save to Rdata file
 # saveRDS(gov_transaction_list_countries, file = "Outputs/gov_transaction_list_countries.rds")
@@ -457,7 +481,7 @@ gov_transaction_countries_summarised <- gov_transaction_countries %>%
   summarise(recipient_country = paste(coalesce(recipient_country, ""), collapse = ", "))
 
 
-##### this extracts recipients
+##### this extracts recipients listed in the transactions####
 
 specific_trans_extract_recipient <- function(id) {
   page_list <- list()
@@ -476,18 +500,33 @@ specific_trans_extract_recipient <- function(id) {
   rbindlist(page_list, fill=T)
 }
 
-# specific_org_extract("GB-GOV-15")
+uk_activity_ids = unique(gov_list_final$iati_identifier)
 
-gov_transaction_list_recipient <- lapply(unique(gov_list_final$iati_identifier), specific_trans_extract_recipient)
-gov_transaction_list_recipient = rbindlist(gov_transaction_list_recipient, fill=T)
+batch_size = 15
+batches = c()
+current_batch = c()
+for(i in 1:length(uk_activity_ids)){
+  current_id = uk_activity_ids[i]
+  if(i %% batch_size == 0){
+    current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+    batches = c(batches, current_batch_str)
+    current_batch = c(current_id)
+  } else {
+    current_batch = c(current_batch, current_id)
+  }
+}
+
+gov_transaction_list_recipient <- lapply(batches, specific_trans_extract_recipient)
+bind_gov_transaction_list_recipient = rbindlist(gov_transaction_list_recipient, fill=TRUE)
+
 
 # Save to Rdata file
-# saveRDS(gov_transaction_list_recipient, file = "Outputs/gov_transaction_list_recipient.rds")
-gov_transaction_list_recipient <- readRDS(file = "Outputs/gov_transaction_list_recipient.rds")
+# saveRDS(bind_gov_transaction_list_recipient, file = "Outputs/bind_gov_transaction_list_recipient.rds")
+bind_gov_transaction_list_recipient <- readRDS(file = "Outputs/bind_gov_transaction_list_recipient.rds")
 
 
 # Extract receiver organisations
-gov_transaction_recipient <- gov_transaction_list_recipient %>% 
+gov_transaction_recipient <- bind_gov_transaction_list_recipient %>% 
   select(iati_identifier, transaction_receiver_org_narrative) %>% 
   # unnest organisation names
   #filter(lengths(receiver_organisation.narrative) != 0) %>% 
@@ -561,7 +600,7 @@ pat <- str_c(RED_AMP_ids, collapse = "|")
 RED_extract <-
   gov_list_final %>% 
   filter(reporting_org_ref=="GB-GOV-1") %>%
-  select(iati_identifier) %>%
+  select(iati_identifier, recipient_country_region) %>%
   mutate(RED_id = str_extract_all(paste(iati_identifier), pat)) %>%
   filter(lengths(RED_id)>0)
 
@@ -571,12 +610,20 @@ RED_extract <-
   RED_extract %>%
   left_join(RED_AMP_location, by = "RED_id")
 
+RED_extract$recipient_country <- ""
+RED_extract$recipient_country <- ifelse(nchar(RED_extract$recipient_country_region) < nchar(RED_extract$Country_Name) & grepl("region", RED_extract$recipient_country_region, ignore.case = TRUE), RED_extract$Country_Name, RED_extract$recipient_country_region)
+RED_extract$recipient_country <- ifelse(is.na(RED_extract$recipient_country), RED_extract$Country_Name, RED_extract$recipient_country)
+RED_extract <- RED_extract %>% select(iati_identifier,RED_id,recipient_country)
+
+
 gov_list_final_red <-
-gov_list_final %>%
+  gov_list_final %>%
   left_join(RED_extract, by = "iati_identifier") %>%
-  mutate(recipient_country_region = coalesce(recipient_country_region, Country_Name)) %>%
-  select(-RED_id, -Country_Name) %>% 
+  mutate(recipient_country_region = coalesce(recipient_country,recipient_country_region)) %>%
+  select(-RED_id, -recipient_country) %>% 
   rename(recipient_country = recipient_country_region)
+
+
 
 # saveRDS(gov_list_final_red, file = "Outputs/gov_list_final_red.rds")
 gov_list_final_red <- readRDS("Outputs/gov_list_final_red.rds")

@@ -40,12 +40,50 @@ tableau_projects <- tableau_projects %>%
         # remove any FCDO component numbers
         mutate(programme_iati_id = if_else(Funder == "Foreign, Commonwealth and Development Office" &
                                    substr(iati_id, nchar(iati_id)-3, nchar(iati_id)-3) == "-",
-                                   substr(iati_id, 1, nchar(iati_id)-4), iati_id)) %>% 
-        # Add programme names on
-        mutate(funder_programme = map(programme_iati_id, extract_iati_activity_name)) %>% 
-        mutate(funder_programme = unlist(funder_programme)) %>% 
-       select(-Funder, -programme_iati_id) %>% 
-       unique()
+                                   substr(iati_id, 1, nchar(iati_id)-4), iati_id))
+
+prog_name_extract <- function(o_code) {
+  page_list <- list()
+  page <- 1
+  page_df = data.frame()
+  
+  while (!is.null(page_df)) {
+    Sys.sleep(1)
+    message(page)
+    page_df <- extract_iati_activity_name(page, o_code)
+    if(!is.null(page_df)){
+      page_list[[page]] = page_df
+    }
+    page = page + 1
+  }
+  rbindlist(page_list, fill=T)
+}
+
+# specific_activity_extract("GB-CHC-1177110-HIF")
+
+programme_extract <- lapply(unique(gov_funder_iati_ids$programme_iati_id), prog_name_extract)
+programme_extract = rbindlist(programme_extract, fill=T)
+programme_extract <- programme_extract %>% 
+  select(c(iati_identifier,title_narrative)) %>%
+  rename(programme_iati_id = iati_identifier)
+
+# Save to Rdata file
+# saveRDS(programme_extract, file = "Outputs/last_programme_extract_kp.rds")
+programme_extract <- readRDS(file = "Outputs/last_programme_extract_kp.rds")
+
+gov_funder_iati_ids <- gov_funder_iati_ids %>%
+  left_join(programme_extract, by = "programme_iati_id") %>%
+  rename(funder_programme = title_narrative) %>%
+  select(-Funder, -programme_iati_id) %>%
+  unnest(funder_programme) %>%
+  unique()
+
+# %>% 
+#         # Add programme names on
+#         mutate(funder_programme = map(programme_iati_id, extract_iati_activity_name)) %>% 
+#         mutate(funder_programme = unlist(funder_programme)) %>% 
+#        select(-Funder, -programme_iati_id) %>% 
+#        unique()
 
   
 # Join funder programme name to main dataset
@@ -58,11 +96,11 @@ tableau_projects_tidied <- tableau_projects %>%
 
 # TEMPORARY ***
 # Remove IDRC DHSC IATI data (this has been provided instead by spreadsheet)
-tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(!(Funder == "Department of Health and Social Care" & 
-           extending_org == "International Development Research Centre" &
-           is.na(amount))
-         )
+# tableau_projects_tidied <- tableau_projects_tidied %>% 
+#   filter(!(Funder == "Department of Health and Social Care" & 
+#            extending_org == "International Development Research Centre" &
+#            is.na(amount))
+#          )
 
 # 5) Write data --------------------------------
 
@@ -86,7 +124,7 @@ tableau_projects_tidied <- tableau_projects_tidied %>%
 
 # Write to RDS 
 saveRDS(tableau_projects_tidied, "Outputs/tableau_projects_tidied.rds")
-# tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds") 
+# tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied.rds")
 
 # Write data to EC google drive 
 # Authorise googlesheets4 to view and manage sheets on EC Drive

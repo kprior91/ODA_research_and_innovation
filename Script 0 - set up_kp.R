@@ -1,7 +1,7 @@
 
 ### Set end of quarter data for update ----
 
-quarter_end_date <- as.Date("2023-04-30")
+quarter_end_date <- as.Date("2023-03-31")
 
 
 ### Check and install packages ----
@@ -50,6 +50,9 @@ if (!("countrycode" %in% packages$Package)) {
 if (!("testthat" %in% packages$Package)) {
   install.packages("testthat")
 } 
+if (!("lubridate" %in% packages$Package)) {
+  install.packages("lubridate")
+} 
 
 library(jsonlite)
 library(httr)
@@ -65,10 +68,11 @@ library(odbc)
 library(countrycode)
 library(testthat)
 library(data.table)
+library(lubridate)
 
 ### Adding in the API Key ----
 
-API_KEY = "cb77cc509def49f9b37a00aefe5ee99f"
+API_KEY = "b2ebb1258b6e43858457db5a48a0a162"
 authentication = add_headers(`Ocp-Apim-Subscription-Key` = API_KEY)
 
 
@@ -110,7 +114,7 @@ unlinked_partner_iati_activity_ids <- readxl::read_xlsx("Inputs/IATI partner act
 #  mutate(recipient_country = NA_character_)
 
 # Wellcome ODA grant data
-wellcome_grants <- readxl::read_excel("Inputs/Wellcome grants_2023.xlsx")
+wellcome_grants <- readxl::read_excel("Inputs/2023-07-26 Wellcome ODA.xlsx")
 
 # BEIS RODA GCRF/Newton extracts
 roda_extract_gcrf <- readxl::read_excel("Inputs/BEIS_GCRF_MODARI_Q4_2022-2023.xlsx", sheet = 1)
@@ -137,7 +141,13 @@ RED_AMP_location <- RED_AMP_location %>%
   rename(Country_Name = Name) %>%
   summarise(Country_Name = paste(coalesce(Country_Name, ""), collapse = ", "))
 
-
+# RED_AMP_location <- RED_AMP_location %>% 
+#   select(Programme, Name) %>%
+#   unique() %>%
+#   group_by(Programme) %>% 
+#   rename(Country_Name = Name) %>%
+#   summarise(Country_Name = paste(coalesce(Country_Name, ""), collapse = ", "))
+# write.xlsx(RED_AMP_location, file = "C:/Users/KimPrior/OneDrive - FCDO/Documents/RED bits/Management Info/UKCDR Climate Tracker commission/RED_countries.xlsx")
 
 ### Functions -----
 
@@ -260,9 +270,9 @@ iati_activity_extract <- function(page, activity_id) {
   rows = 1000
   start <- (page - 1) * rows
   path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
-                 'q=iati_identifier:"',
+                 'q=iati_identifier:',
                  activity_id,
-                 '"&wt=json',
+                 '&wt=json',
                  '&rows=',rows,
                  '&start=',start,
                  "&fl=iati_identifier,other_identifier*,reporting_org*,location*,sector_code*,default_flow_type*,recipient_country_code,recipient_region_code,activity_date*,budget*,policy_marker*,activity_status*,hierarchy*,title*,description*,participating_org*,related_activity*,tag*")
@@ -352,6 +362,33 @@ org_activity_extract_IDRC <- function(page, IDRC) {
 }
 
 # Function to extract COUNTRIES from transactions for a specified IATI activity ID
+# the latest transactions_extract_country function is below, modified as my batches code don't work anymore
+
+# transactions_extract_country <- function(page, activity_id) {
+#   rows <- 1000
+#   start <- (page - 1) * rows
+#   path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+#                  'q=iati_identifier:',
+#                  activity_id,
+#                  '&wt=json',
+#                  '&rows=', rows,
+#                  '&start=', start,
+#                  '&fl=iati_identifier,value*,transaction_date*,transaction_recipient_country_code,description*,currency*')
+#   request <- GET(url = path, authentication)
+#   message(request$status_code)
+#   response <- content(request, as = "text", encoding = "UTF-8")
+#   response <- fromJSON(response, flatten = TRUE)
+#   new_data <- response$response$docs
+#   numb_data <- response$response$numFound
+#   # Condition to check when to stop
+#   
+#   if(start >= numb_data) {
+#     return(NULL)
+#   }
+#   return(new_data)
+#   
+# }
+
 transactions_extract_country <- function(page, activity_id) {
   rows <- 1000
   start <- (page - 1) * rows
@@ -377,9 +414,35 @@ transactions_extract_country <- function(page, activity_id) {
   
 }
 
-
-
 # Function to extract RECIPIENTS from transactions for a specified IATI activity ID
+# the latest transactions_extract_recipient function is below, modified as my batches code don't work anymore
+
+# transactions_extract_recipient <- function(page, activity_id) {
+#   rows <- 1000
+#   start <- (page - 1) * rows
+#   path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+#                  'q=iati_identifier:',
+#                  activity_id,
+#                  '&wt=json',
+#                  '&rows=', rows,
+#                  '&start=', start,
+#                  '&fl=iati_identifier,value*,transaction_date*,transaction_receiver_org_narrative,transaction_receiver_org_ref,description*,currency*')
+#   request <- GET(url = path, authentication)
+#   message(request$status_code)
+#   response <- content(request, as = "text", encoding = "UTF-8")
+#   response <- fromJSON(response, flatten = TRUE)
+#   new_data <- response$response$docs
+#   numb_data <- response$response$numFound
+#   # Condition to check when to stop
+#   
+#   if(start >= numb_data) {
+#     return(NULL)
+#   }
+#   return(new_data)
+#   
+# }
+
+
 transactions_extract_recipient <- function(page, activity_id) {
   rows <- 1000
   start <- (page - 1) * rows
@@ -397,13 +460,14 @@ transactions_extract_recipient <- function(page, activity_id) {
   new_data <- response$response$docs
   numb_data <- response$response$numFound
   # Condition to check when to stop
-  
+
   if(start >= numb_data) {
     return(NULL)
   }
   return(new_data)
-  
+
 }
+
 
 # Function to extract activity names from an IATI activity ID
 
@@ -411,9 +475,9 @@ extract_iati_activity_name <- function(page, activity_id) {
   rows <- 1000
   start <- (page - 1) * rows
   path <- paste0('https://api.iatistandard.org/datastore/activity/select?',
-                 'q=iati_identifier:"',
+                 'q=iati_identifier:',
                  activity_id,
-                 '"&wt=json',
+                 '&wt=json',
                  '&rows=', rows,
                  '&start=', start,
                  "&fl=iati_identifier,title*")

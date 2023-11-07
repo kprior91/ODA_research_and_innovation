@@ -55,7 +55,7 @@ specific_transaction_extract <- function(o_code) {
 
 uk_activity_ids = unique(ri_iati_activities$iati_identifier)
 
-batch_size = 10
+batch_size = 15
 batches = c()
 current_batch = c()
 for(i in 1:length(uk_activity_ids)){
@@ -70,7 +70,7 @@ for(i in 1:length(uk_activity_ids)){
 }
 
 linked_transaction_extract <- lapply(batches, specific_transaction_extract)
-linked_transaction_extract = rbindlist(linked_transaction_extract, fill=T)
+linked_transaction_extract = rbindlist(linked_transaction_extract, fill=TRUE)
 
 linked_transaction_extract$transaction_provider_org_provider_activity_id <- as.character(linked_transaction_extract$transaction_provider_org_provider_activity_id)
 

@@ -30,10 +30,27 @@ specific_activity_extract <- function(o_code) {
   rbindlist(page_list, fill=T)
 }
 
-# specific_activity_extract("GB-CHC-1177110-HIF")
+uk_activity_ids = unique(partner_iati_activity_ids$iati_identifier)
 
-partner_activity_extract <- lapply(unique(partner_iati_activity_ids$iati_identifier), specific_activity_extract)
-partner_activity_extract = rbindlist(partner_activity_extract, fill=T)
+batch_size = 15
+batches = c()
+current_batch = c()
+for(i in 1:length(uk_activity_ids)){
+  current_id = uk_activity_ids[i]
+  if(i %% batch_size == 0){
+    current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+    batches = c(batches, current_batch_str)
+    current_batch = c(current_id)
+  } else {
+    current_batch = c(current_batch, current_id)
+  }
+}
+
+partner_activity_extract <- lapply(batches, specific_activity_extract)
+partner_activity_extract = rbindlist(partner_activity_extract, fill=TRUE)
+
+#partner_activity_extract <- lapply(unique(partner_iati_activity_ids$iati_identifier), specific_activity_extract)
+#partner_activity_extract = rbindlist(partner_activity_extract, fill=T)
 
 
 # length(unique(partner_activity_extract$reporting_org_ref))
@@ -213,20 +230,14 @@ partnership_activities <- readRDS(file = "Outputs/partnership_activities_kp.rds"
 
 ### C) Combine individual with partner activities (extractions A and B above) ---- 
 
-# partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>% 
-#   filter(default_flow_type_code == "10" | is.na(default_flow_type_code))
-
-# Going to not filter on ODA/NA for now, because it removes the ODI entries (which are coded as 30 and present in Emma's final dataset)
-
 partner_activity_extract <- partner_activity_extract %>% filter(!iati_identifier %in% c(partnership_activities$iati_identifier))
 
-partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>%
-  filter(default_flow_type_code == "10" | is.na(default_flow_type_code))
+partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities))
 # partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>%
 #   filter(default_flow_type_code != "50")
 
-partner_activity_comb$activity_id <- ifelse(partner_activity_comb$activity_id %in% c("GB-COH-RC000658-GB-GOV-1-301132","cGB-COH-RC000658-GB-GOV-1-301132"),
-                                            "GB-COH-RC000658 -GB-GOV-1-301132", partner_activity_comb$activity_id)
+# partner_activity_comb$activity_id <- ifelse(partner_activity_comb$activity_id %in% c("GB-COH-RC000658-GB-GOV-1-301132","cGB-COH-RC000658-GB-GOV-1-301132"),
+#                                            "GB-COH-RC000658 -GB-GOV-1-301132", partner_activity_comb$activity_id)
 
 partner_activity_comb <- partner_activity_comb %>% filter(iati_identifier!="US-EIN-134166228-GB-COH-06274284-TEA2 - Pioneer Energy Investment Initiative 2")
 
@@ -647,14 +658,32 @@ specific_trans_extract_country <- function(id) {
   rbindlist(page_list, fill=T)
 }
 
-# specific_org_extract("GB-GOV-15")
+uk_activity_ids = unique(partner_activity_comb$iati_identifier)
+uk_activity_ids <- URLencode(uk_activity_ids)
 
-transaction_list_countries <- lapply(unique(partner_activity_comb$iati_identifier), specific_trans_extract_country)
-transaction_list_countries = rbindlist(transaction_list_countries, fill=T)
+# My batches code isn't working at the moment, so having to run them individually
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
+
+# transaction_list_countries <- lapply(batches, specific_trans_extract_country)
+transaction_list_countries <- lapply(uk_activity_ids, specific_trans_extract_country)
+transaction_list_countries = rbindlist(transaction_list_countries, fill=TRUE)
+
 
 # Save to Rdata file
-# saveRDS(transaction_list_countries, file = "Outputs/transaction_list_countries_kp.rds")
-transaction_list_countries <- readRDS(file = "Outputs/transaction_list_countries_kp.rds")
+# saveRDS(transaction_list_countries, file = "Outputs/transaction_list_countries_kp_oct23.rds")
+transaction_list_countries <- readRDS(file = "Outputs/transaction_list_countries_kp_oct23.rds")
 
 transaction_list_countries$recipient_country <- countrycode_list$name[match(transaction_list_countries$transaction_recipient_country_code,countrycode_list$code)]
 
@@ -690,14 +719,32 @@ specific_trans_extract_recipient <- function(id) {
           rbindlist(page_list, fill=T)
         }
         
-        # specific_org_extract("GB-GOV-15")
-        
-transaction_list_recipient <- lapply(unique(partner_activity_comb$iati_identifier), specific_trans_extract_recipient)
-transaction_list_recipient = rbindlist(transaction_list_recipient, fill=T)
-        
+uk_activity_ids = unique(partner_activity_comb$iati_identifier)
+uk_activity_ids <- URLencode(uk_activity_ids)
+
+# My batches code isn't working at the moment, so having to run them individually
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
+
+# transaction_list_recipient <- lapply(batches, specific_trans_extract_recipient)
+transaction_list_recipient <- lapply(uk_activity_ids, specific_trans_extract_recipient)
+transaction_list_recipient = rbindlist(transaction_list_recipient, fill=TRUE)
+
+
 # Save to Rdata file
-# saveRDS(transaction_list_recipient, file = "Outputs/transaction_list_recipient_kp.rds")
-transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient_kp.rds")
+# saveRDS(transaction_list_recipient, file = "Outputs/transaction_list_recipient_kp_oct23.rds")
+transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient_kp_oct23.rds")
 
         
     # Extract receiver organisations
@@ -721,8 +768,8 @@ transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient
                      organisation_name = transaction_receiver_org_narrative) %>% 
               # Look up country from both country code and organisation name
               mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
-              mutate(organisation_country = unlist(organisation_country)) %>% 
-              mutate(organisation_role = 2) # partners
+              mutate(organisation_country = unlist(organisation_country))
+              #mutate(organisation_role = 2) # partners
               
               # Add on to org file to save
               org_names_and_locations_1 <- org_names_and_locations_1 %>% 
@@ -815,8 +862,8 @@ activity_list <- activity_list %>%
              TRUE ~ gov_funder)) %>% unique()
 
 # Save to Rdata file
-saveRDS(activity_list, file = "Outputs/partner_activity_list_kp.rds")
-activity_list <- readRDS(file = "Outputs/partner_activity_list_kp.rds")
+# saveRDS(activity_list, file = "Outputs/partner_activity_list_kp_oct23.rds")
+activity_list <- readRDS(file = "Outputs/partner_activity_list_kp_oct23.rds")
 # write.xlsx(activity_list, file = "Outputs/partner_activity_list_kp.xlsx")
 
 # Save org names and countries to file
