@@ -322,6 +322,10 @@ saveRDS(tableau_projects_tidied, "Outputs/tableau_projects_tidied_kp_2607.rds")
 write.xlsx(tableau_projects_tidied, file = "Outputs/tableau_projects_tidied_kp_2607.xlsx")
 
 
+# comparing sector codes in AMP with what came from IATI
+
+
+
 # creating a version to be downloaded from the modari map without splitting out by country
 
 tableau_projects_tidied_dwnld <- tableau_projects_tidied %>% 
