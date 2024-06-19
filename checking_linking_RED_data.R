@@ -11,7 +11,7 @@ API_KEY = "cb77cc509def49f9b37a00aefe5ee99f"
 authentication = add_headers(`Ocp-Apim-Subscription-Key` = API_KEY)
 
 
-RED_data <- readRDS("Outputs/RED_data_funder_060423.rds")
+RED_data <- readRDS("Data checks/Inputs/RED_data_funder_060423.rds")
 
 # function that takes RED activity IDs and then looks for them in transactions of other activities
 # this gets the partners that link back to RED
@@ -109,6 +109,6 @@ FCDO_RED_list <- RED_data %>%
 # and filter for the NA's in column D (which came from "ri_linked_activities"). Double check these on IATI 
 # and then add to the "IATI partner activities_kp" document.
 
-write.xlsx(as.data.frame(RED_linked_activites),"Outputs/RED_linked_activities.xlsx")
-write.xlsx(FCDO_RED_list,"Outputs/FCDO_RED_list.xlsx")
-write.xlsx(ri_linked_activites,"Outputs/ri_linked_activites.xlsx")
+write.xlsx(as.data.frame(RED_linked_activites),"Data checks/Outputs/RED_linked_activities.xlsx")
+write.xlsx(FCDO_RED_list,"Data checks/Outputs/FCDO_RED_list.xlsx")
+write.xlsx(ri_linked_activites,"Data checks/Outputs/ri_linked_activites.xlsx")

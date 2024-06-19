@@ -4,8 +4,8 @@
 # --------------------------------------------------------------- #
 
 # Read in collated dataset from previous script
-all_projects_tidied <- readRDS("Outputs/all_projects_tidied_kp_1907.rds")
-org_names_and_locations <- readRDS("Outputs/org_names_and_locations_kp.rds")
+all_projects_tidied <- readRDS("Outputs/all_projects_tidied_Jan24update_2901.rds")
+org_names_and_locations <- readRDS("Outputs/org_names_and_locations_Jan24update.rds")
 
 # Connect to ODA RI Projects database on development server
 # (need to be connected to DFID VPN)
@@ -49,17 +49,17 @@ duplicates <- project_table %>%
 # remove duplicate rows (rough)
 project_table <- project_table[!duplicated(project_table$project_id), ] 
 
-saveRDS(project_table, file = "Outputs/project_table_kp.rds")
+saveRDS(project_table, file = "Outputs/project_table_Jan24update.rds")
 
 
 # 2) Create funder table ----
 
 funder_table <- all_projects_tidied %>% 
   select(project_id = id, funder = Funder, 
-         fund = Fund, cofunder = `Co-Funder`, funder_iati_id = iati_id) %>% 
+         fund = Fund, funder_iati_id = iati_id) %>% 
   unique()
 
-saveRDS(funder_table, file = "Outputs/funder_table_kp.rds")
+saveRDS(funder_table, file = "Outputs/funder_table_Jan24update.rds")
 
 
 # 3) Create organisation table ----
@@ -91,8 +91,8 @@ organisation_table <- org_names_and_locations %>%
                       TRUE ~ organisation_country)) %>% 
   mutate(organisation_country = str_to_title(organisation_country))
 
-saveRDS(organisation_table, file = "Outputs/organisation_table_kp.rds")
-write.xlsx(organisation_table, file = "Outputs/organisation_table_kp.xlsx")
+# saveRDS(organisation_table, file = "Outputs/organisation_table_Jan24update.rds")
+write.xlsx(organisation_table, file = "Outputs/organisation_table_Jan24update.xlsx")
 
 
 # 4) Create country table ----
@@ -115,6 +115,13 @@ country_table_cleaned <- country_table %>%
   mutate(Country = str_replace_all(Country, "\\(the\\)", ""),  # remove (the)
          Country = gsub("[()]", "", Country),                  # remove all parentheses
          Country = str_replace_all(Country, "tanzania, united republic of", "tanzania"),
+         Country = str_replace_all(Country, "antigua & barbuda", "antigua and barbuda"),
+         Country = str_replace_all(Country, "czech republic", "czechia"),
+         Country = str_replace_all(Country, "perú", "peru"),
+         Country = str_replace_all(Country, "kyrgyz republic", "kyrgyzstan"),
+         Country = str_replace_all(Country, "türkiye", "turkey"),
+         Country = str_replace_all(Country, "sénégal", "senegal"),
+         Country = str_replace_all(Country, "burma", "myanmar"),
          Country = str_replace_all(Country, "congo the democratic republic of the|drc|democratic republic of congo", 
                                    "democratic republic of the congo"),
          Country = str_replace_all(Country, "china people's republic of", "china"),
@@ -172,9 +179,9 @@ country_table_final <- country_table_cleaned %>%
     select(-row_id)
 
   # Save datasets for testing
-saveRDS(country_table, file = "Outputs/country_table_kp.rds")
-saveRDS(country_table_cleaned, file = "Outputs/country_table_cleaned_kp.rds")
-saveRDS(country_table_final, file = "Outputs/country_table_final_kp.rds")
+saveRDS(country_table, file = "Outputs/country_table_Jan24update.rds")
+saveRDS(country_table_cleaned, file = "Outputs/country_table_cleaned_Jan24update.rds")
+saveRDS(country_table_final, file = "Outputs/country_table_final_Jan24update.rds")
 
 
 # 5) Delete and write data in database table ----

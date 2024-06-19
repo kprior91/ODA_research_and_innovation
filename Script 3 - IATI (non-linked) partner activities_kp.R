@@ -6,14 +6,14 @@
 ### 1) Extract IATI data on RI partner activities (linked or manually identified) ----
 
 # Read in linked partner IATI activity info from script 2
-ri_linked_activites <- readRDS(file = "Outputs/ri_linked_activites_kp.rds")
+ri_linked_activites <- readRDS(file = "Outputs/ri_linked_activites_Jan24update.rds")
 
 # Manually add on other (non-linked) partner activities from Excel
 partner_iati_activity_ids <- unlinked_partner_iati_activity_ids %>% 
   plyr::rbind.fill(ri_linked_activites)
 
 
-specific_activity_extract <- function(o_code) {
+specific_activity_extract <- function(activity_id) {
   page_list <- list()
   page <- 1
   page_df = data.frame()
@@ -21,7 +21,7 @@ specific_activity_extract <- function(o_code) {
   while (!is.null(page_df)) {
     Sys.sleep(1)
     message(page)
-    page_df <- iati_activity_extract(page, o_code)
+    page_df <- iati_activity_extract(page, activity_id)
     if(!is.null(page_df)){
       page_list[[page]] = page_df
     }
@@ -30,10 +30,45 @@ specific_activity_extract <- function(o_code) {
   rbindlist(page_list, fill=T)
 }
 
-# specific_activity_extract("GB-CHC-1177110-HIF")
+uk_activity_ids = unique(partner_iati_activity_ids$iati_identifier)
+uk_activity_ids <- gsub(" ", "%", uk_activity_ids)
+uk_activity_ids_new <- URLencode(ri_linked_activites_new$iati_identifier)
 
-partner_activity_extract <- lapply(unique(partner_iati_activity_ids$iati_identifier), specific_activity_extract)
+uk_activity_ids <- uk_activity_ids[!grepl("/|)", uk_activity_ids)]
+uk_activity_ids_symbols <- uk_activity_ids[grepl("/|)", uk_activity_ids)]
+# uk_activity_ids_p1 <- uk_activity_ids[218]
+
+uk_activity_ids <- str_replace(uk_activity_ids, "CA-CRA_ACR-811793611-%CA-CRA_ACR-811793611-HGC_JUN2022", "CA-CRA_ACR-811793611-HGC")
+uk_activity_ids <- str_replace(uk_activity_ids, "GB-COH-03122495-A0268DFID%Programme%Directorate%education", "GB-COH-03122495-A0268DFID%PROGRAMME%DIRECTORATE%EDUCATION")
+uk_activity_ids <- uk_activity_ids[!grepl("GB-COH-03122495-A0268DFID%PROGRAMME%DIRECTORATE%EDUCATION", uk_activity_ids)]
+
+# i think below code will work, just it doesn't like certain symbols such as brackets
+# need to find a way to remove or get those to run
+
+partner_activity_extract <- lapply(uk_activity_ids, specific_activity_extract)
 partner_activity_extract = rbindlist(partner_activity_extract, fill=T)
+# partner_activity_extract_new <- lapply(uk_activity_ids_new, specific_activity_extract)
+# partner_activity_extract_new = rbindlist(partner_activity_extract_new, fill=T)
+
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
+# 
+# partner_activity_extract <- lapply(batches, specific_activity_extract)
+# partner_activity_extract = rbindlist(partner_activity_extract, fill=TRUE)
+
+#partner_activity_extract <- lapply(unique(partner_iati_activity_ids$iati_identifier), specific_activity_extract)
+#partner_activity_extract = rbindlist(partner_activity_extract, fill=T)
 
 
 # length(unique(partner_activity_extract$reporting_org_ref))
@@ -56,9 +91,12 @@ partner_activity_extract = rbindlist(partner_activity_extract, fill=T)
 # 
 # partner_activity_extract <- bind_rows(partner_activity_extract)
 
+# partner_activity_extract <- rbind(partner_activity_extract,partner_activity_extract_new, fill=TRUE)
+
 # Save to Rdata file
-# saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract_kp.rds")
-partner_activity_extract <- readRDS(file = "Outputs/partner_activity_extract_kp.rds")
+# saveRDS(partner_activity_extract, file = "Outputs/partner_activity_extract_Jan24update.rds")
+partner_activity_extract <- readRDS(file = "Outputs/partner_activity_extract_Jan24update.rds")
+# partner_activity_extract_kp <- readRDS(file = "Outputs/partner_activity_extract_kp.rds")
 
 # Join on funder and fund information
 partner_activity_extract <- partner_activity_extract %>%       
@@ -144,8 +182,8 @@ org_activity_list_IDRC$participating_org_ref <- ifelse(org_activity_list_IDRC$pa
 org_activity_list <- plyr::rbind.fill(org_activity_list,org_activity_list_IDRC)
 
 
-# saveRDS(org_activity_list, "Outputs/org_activity_list_kp.rds")
-org_activity_list <- readRDS("Outputs/org_activity_list_kp.rds")
+# saveRDS(org_activity_list, "Outputs/org_activity_list_Jan24update.rds")
+org_activity_list <- readRDS("Outputs/org_activity_list_Jan24update.rds")
 
 
         # 2.A) Unlist activity titles and subset for those that mention FCDO/DFID
@@ -207,26 +245,20 @@ org_activity_list <- readRDS("Outputs/org_activity_list_kp.rds")
           inner_join(partnership_activities, by = "iati_identifier")
 
 # Save to Rdata file
-# saveRDS(partnership_activities, file = "Outputs/partnership_activities_kp.rds")
-partnership_activities <- readRDS(file = "Outputs/partnership_activities_kp.rds")
+# saveRDS(partnership_activities, file = "Outputs/partnership_activities_Jan24update.rds")
+partnership_activities <- readRDS(file = "Outputs/partnership_activities_Jan24update.rds")
 # partnership_activities_ec <- readRDS(file = "Outputs/partnership_activities.rds")
 
 ### C) Combine individual with partner activities (extractions A and B above) ---- 
 
-# partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>% 
-#   filter(default_flow_type_code == "10" | is.na(default_flow_type_code))
-
-# Going to not filter on ODA/NA for now, because it removes the ODI entries (which are coded as 30 and present in Emma's final dataset)
-
 partner_activity_extract <- partner_activity_extract %>% filter(!iati_identifier %in% c(partnership_activities$iati_identifier))
 
-partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>%
-  filter(default_flow_type_code == "10" | is.na(default_flow_type_code))
+partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities))
 # partner_activity_comb <- plyr::rbind.fill(as.data.frame(partner_activity_extract), as.data.frame(partnership_activities)) %>%
 #   filter(default_flow_type_code != "50")
 
-partner_activity_comb$activity_id <- ifelse(partner_activity_comb$activity_id %in% c("GB-COH-RC000658-GB-GOV-1-301132","cGB-COH-RC000658-GB-GOV-1-301132"),
-                                            "GB-COH-RC000658 -GB-GOV-1-301132", partner_activity_comb$activity_id)
+# partner_activity_comb$activity_id <- ifelse(partner_activity_comb$activity_id %in% c("GB-COH-RC000658-GB-GOV-1-301132","cGB-COH-RC000658-GB-GOV-1-301132"),
+#                                            "GB-COH-RC000658 -GB-GOV-1-301132", partner_activity_comb$activity_id)
 
 partner_activity_comb <- partner_activity_comb %>% filter(iati_identifier!="US-EIN-134166228-GB-COH-06274284-TEA2 - Pioneer Energy Investment Initiative 2")
 
@@ -260,7 +292,26 @@ filter(title_narrative_xml_lang != "fr") %>%
   summarise(title_narrative = paste(coalesce(title_narrative, ""), collapse = "; ")) %>%
   rename(activity_title = title_narrative)
 
+# need to get below to run - more problems with french names!!
+
+# need to identify where names and languages don't match
+
 activity_list_unnest_1_description <- partner_activity_comb %>%
+  select(iati_identifier, description_narrative, description_narrative_xml_lang)
+activity_list_unnest_1_description$len_narr <- lengths(activity_list_unnest_1_description$description_narrative)
+activity_list_unnest_1_description$len_lang <- lengths(activity_list_unnest_1_description$description_narrative_xml_lang)
+activity_list_unnest_1_description$diff <- activity_list_unnest_1_description$len_narr - activity_list_unnest_1_description$len_lang
+
+activity_list_unnest_1_description_with_lists <- activity_list_unnest_1_description[activity_list_unnest_1_description$len_narr > 1,]
+activity_list_unnest_1_description_with_lists <- activity_list_unnest_1_description_with_lists[activity_list_unnest_1_description_with_lists$len_lang != 0,]
+activity_list_unnest_1_description_with_lists <- activity_list_unnest_1_description_with_lists[activity_list_unnest_1_description_with_lists$diff != 0,]
+activity_list_unnest_1_description_with_lists <- activity_list_unnest_1_description_with_lists$iati_identifier
+
+# now unnesting everything that isn't those that mismatch
+
+activity_list_unnest_1_description1 <- activity_list_unnest_1_description[!activity_list_unnest_1_description$iati_identifier %in% c(activity_list_unnest_1_description_with_lists),]
+
+activity_list_unnest_1_description1 <- activity_list_unnest_1_description1 %>%
   select(iati_identifier, description_narrative, description_narrative_xml_lang) %>%
   unnest(cols = c(description_narrative,description_narrative_xml_lang)) %>%
   mutate(description_narrative_xml_lang = ifelse(is.na(description_narrative_xml_lang),"",description_narrative_xml_lang)) %>%
@@ -271,8 +322,18 @@ activity_list_unnest_1_description <- partner_activity_comb %>%
   summarise(description_narrative = paste(coalesce(description_narrative, ""), collapse = "; ")) %>%
   rename(activity_description = description_narrative)
 
+activity_list_unnest_1_description2 <- activity_list_unnest_1_description[activity_list_unnest_1_description$iati_identifier %in% c(activity_list_unnest_1_description_with_lists),]
 
-activity_list_unnest_1 <- full_join(activity_list_unnest_1_title, activity_list_unnest_1_description, by = "iati_identifier")
+activity_list_unnest_1_description2 <- activity_list_unnest_1_description2 %>%
+  select(iati_identifier, description_narrative) %>%
+  unnest(cols = c(description_narrative)) %>%
+  filter(row_number() %% 2 == 1) %>%
+  unique() %>% 
+  group_by(iati_identifier) %>%
+  summarise(description_narrative = paste(coalesce(description_narrative, ""), collapse = "; ")) %>%
+  rename(activity_description = description_narrative)
+
+activity_list_unnest_1 <- full_join(activity_list_unnest_1_title, activity_list_unnest_1_description1, activity_list_unnest_1_description2, by = "iati_identifier")
 
 # Summarise records with multiple "General" descriptions
 # activity_list_unnest_1 <- activity_list_unnest_1 %>%
@@ -356,15 +417,74 @@ activity_list_unnest_3 <- activity_list_unnest_3 %>% select(-sector_code) %>%
 
 # 4) Unlist implementing organisations
 
-# # The code below used to work! not sure why it doesnt now, but i'm now having issues with "XM-DAC-301-2" and participating org names in multiple languages
-# 
+# code below is trying to work out where the mismatching names/roles are
+
 activity_list_unnest_4 <- partner_activity_comb %>%
-  #filter(lengths(participating_org_ref) != 0) %>%
-  #unnest(c(participating_org_ref, participating_org_narrative)) %>%
-  select(iati_identifier, participating_org_role, participating_org_narrative, participating_org_ref) %>%
-  unnest(c(participating_org_role, participating_org_narrative, participating_org_ref)) %>%
+  select(iati_identifier, participating_org_role, participating_org_narrative, participating_org_ref)
+activity_list_unnest_4$len_role <- lengths(activity_list_unnest_4$participating_org_role)
+activity_list_unnest_4$len_narr <- lengths(activity_list_unnest_4$participating_org_narrative)
+activity_list_unnest_4$len_ref <- lengths(activity_list_unnest_4$participating_org_ref)
+activity_list_unnest_4$rolenarr_diff <- activity_list_unnest_4$len_role - activity_list_unnest_4$len_narr
+activity_list_unnest_4$narrref_diff <- activity_list_unnest_4$len_narr - activity_list_unnest_4$len_ref
+activity_list_unnest_4$roleref_diff <- activity_list_unnest_4$len_role - activity_list_unnest_4$len_ref
+
+activity_list_unnest_4_orgdiffs <- activity_list_unnest_4[activity_list_unnest_4$rolenarr_diff != 0,]
+activity_list_unnest_4 <- activity_list_unnest_4[!activity_list_unnest_4$rolenarr_diff != 0,]
+
+activity_list_unnest_4_1 <- activity_list_unnest_4 %>%
+  select(iati_identifier, participating_org_role, participating_org_narrative) %>%
+  unnest(c(participating_org_role, participating_org_narrative)) %>%
   filter(participating_org_role == "4") %>%
   unique()
+
+activity_list_unnest_4_1$participating_org_narrative <- ifelse(activity_list_unnest_4_1$participating_org_narrative == "**********",
+                                                               "", activity_list_unnest_4_1$participating_org_narrative)
+
+
+activity_list_unnest_4_orgdiffs <- activity_list_unnest_4_orgdiffs %>%
+  mutate(participating_org_role = map2(participating_org_role, len_narr, ~head(.x, .y)))
+
+activity_list_unnest_4_2 <- activity_list_unnest_4_orgdiffs %>%
+  select(iati_identifier, participating_org_role, participating_org_narrative) %>%
+  unnest(c(participating_org_role, participating_org_narrative)) %>%
+  filter(participating_org_role == "4") %>%
+  unique()
+
+activity_list_unnest_4 <- rbind(activity_list_unnest_4_1, activity_list_unnest_4_2)
+rm(activity_list_unnest_4_1,activity_list_unnest_4_2,activity_list_unnest_4_orgdiffs)
+
+activity_list_unnest_4_refs <- partner_activity_comb %>%
+  select(iati_identifier, participating_org_role, participating_org_narrative, participating_org_ref)
+
+# activity_list_unnest_4_refs <- activity_list_unnest_4_refs %>%
+#   mutate(participating_org_narrative = map2(participating_org_narrative, len_ref, ~head(.x, .y))) %>%
+#   select(participating_org_narrative, participating_org_ref) %>%
+#   unnest(c(participating_org_narrative, participating_org_ref)) %>%
+#   unique()
+
+activity_list_unnest_4_refs$len_narr <- lengths(activity_list_unnest_4_refs$participating_org_narrative)
+activity_list_unnest_4_refs$len_ref <- lengths(activity_list_unnest_4_refs$participating_org_ref)
+activity_list_unnest_4_refs$narrref_diff <- activity_list_unnest_4_refs$len_narr - activity_list_unnest_4_refs$len_ref
+mismatch <- activity_list_unnest_4_refs[activity_list_unnest_4_refs$narrref_diff != 0,]
+mismatch_narr <- unlist(mismatch$participating_org_narrative)
+mismatch_ref <- unlist(mismatch$participating_org_ref)
+mismatch_ref <- mismatch_ref[-1]
+mismatch <- data.frame(mismatch_narr, mismatch_ref)
+
+activity_list_unnest_4_refs <- activity_list_unnest_4_refs %>%
+  filter(narrref_diff == 0) %>%
+  select(participating_org_narrative, participating_org_ref) %>%
+  unnest(c(participating_org_narrative, participating_org_ref)) %>%
+  unique()
+
+
+names(mismatch) <- names(activity_list_unnest_4_refs)
+
+activity_list_unnest_4_refs <- rbind(activity_list_unnest_4_refs, mismatch)
+
+
+#"**********"
+#"Not registered in IATI"
 
 # Will need to run the code separately for IDRC using Alex from IATI new bit of code
 
@@ -400,10 +520,12 @@ activity_list_unnest_4 <- partner_activity_comb %>%
   
   # Add country locations based on IATI org references or lookup
   # (takes ~5 mins to run)
-activity_list_unnest_4 <- activity_list_unnest_4 %>%
-    # Extract 2 digit country code from org references (where populated)
-    mutate(country_code = if_else((!is.na(participating_org_ref) & substr(participating_org_ref,3,3) == "-" & !(substr(participating_org_ref,1,2) %in% c("XI", "XM"))), 
-                                  substr(participating_org_ref,1,2), ""))
+    # below code not working due to problems with org ref id not matching narrative
+    
+# activity_list_unnest_4 <- activity_list_unnest_4 %>%
+#     # Extract 2 digit country code from org references (where populated)
+#     mutate(country_code = if_else((!is.na(participating_org_ref) & substr(participating_org_ref,3,3) == "-" & !(substr(participating_org_ref,1,2) %in% c("XI", "XM"))), 
+#                                   substr(participating_org_ref,1,2), ""))
   
   # Function searches the org title (e.g. Kenya) and returns a country if its present in the name
 activity_list_unnest_4$country_name2 <- map(activity_list_unnest_4$participating_org_narrative, org_country_lookup)
@@ -412,15 +534,19 @@ activity_list_unnest_4$country_name2 <- as.character(activity_list_unnest_4$coun
   
   
   # check if input is a valid 2-digit country code and then does a lookup to the countrycode_list
-  activity_list_unnest_4$country_name <- ifelse(is.na(activity_list_unnest_4$country_code) | nchar(activity_list_unnest_4$country_code) < 2, NA, countrycode_list$name[match(activity_list_unnest_4$country_code,countrycode_list$code)])
-  activity_list_unnest_4$country_name <- ifelse(is.na(activity_list_unnest_4$country_name), "", activity_list_unnest_4$country_name)
+  # activity_list_unnest_4$country_name <- ifelse(is.na(activity_list_unnest_4$country_code) | nchar(activity_list_unnest_4$country_code) < 2, NA, countrycode_list$name[match(activity_list_unnest_4$country_code,countrycode_list$code)])
+  # activity_list_unnest_4$country_name <- ifelse(is.na(activity_list_unnest_4$country_name), "", activity_list_unnest_4$country_name)
   
-  activity_list_unnest_4[activity_list_unnest_4 == ""] <- NA
+  # activity_list_unnest_4[activity_list_unnest_4 == ""] <- NA
   
   # This needs fixing because currently I don't know why it's only picking one of the country names when there might be several 
-  activity_list_unnest_4$partner_country <- coalesce(activity_list_unnest_4$country_name, activity_list_unnest_4$country_name2)
+  # activity_list_unnest_4$partner_country <- coalesce(activity_list_unnest_4$country_name, activity_list_unnest_4$country_name2)
+  activity_list_unnest_4 <- activity_list_unnest_4 %>% rename(partner_country = country_name2)
   
-  activity_list_unnest_4 <- activity_list_unnest_4%>% select(-country_name, -country_name2)
+  # partner_org_lookup <- activity_list_unnest_4 %>% select(participating_org_narrative, partner_country) %>% unique()
+  # write.csv(partner_org_lookup, file = "Inputs/partner_org_lookup.csv", na = "")
+  
+  # activity_list_unnest_4 <- activity_list_unnest_4%>% select(-country_name, -country_name2)
   
   # Summarise partner org countries and names
   activity_list_unnest_4_countries <- activity_list_unnest_4 %>% 
@@ -439,7 +565,8 @@ activity_list_unnest_4$country_name2 <- as.character(activity_list_unnest_4$coun
   
   # Add partner name and country info to master dataset
   activity_list_unnest_4 <- activity_list_unnest_4 %>% 
-    select(-participating_org_narrative, -participating_org_ref, -country_code, -participating_org_role, -partner_country) %>% 
+    #select(-participating_org_narrative, -participating_org_ref, -country_code, -participating_org_role, -partner_country) %>%
+    select(-participating_org_narrative, -participating_org_role, -partner_country) %>%
     left_join(activity_list_unnest_4_partners, by = "iati_identifier") %>% 
     left_join(activity_list_unnest_4_countries, by = "iati_identifier") %>%
     unique()
@@ -500,8 +627,8 @@ activity_list_unnest_4$country_name2 <- as.character(activity_list_unnest_4$coun
       rbind(orgs_to_save)
   
 # Save to Rdata file
-# saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1_kp.rds")
-org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1_kp.rds")
+# saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1_Jan24update.rds")
+org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1_Jan24update.rds")
     
 # 6) Unlist and aggregate budget
 # activity_list_unnest_6 <- partner_activity_comb %>% 
@@ -536,23 +663,54 @@ org_names_and_locations_1 <- readRDS(file = "Outputs/org_names_and_locations_1_k
 #                   amount = sum(amount))
 
 
-activity_list_unnest_6 <- partner_activity_comb %>% 
+activity_list_unnest_6_test <- partner_activity_comb %>% 
+  select(iati_identifier, 
+         reporting_org_narrative,
+         iati_identifier, budget_status,budget_value,
+         budget_value_currency,budget_period_start_iso_date,
+         budget_period_end_iso_date) %>%
           filter(lengths(budget_value) != 0) %>%
-          unnest(c(budget_status,budget_value,budget_value_currency,budget_period_start_iso_date,budget_period_end_iso_date)) %>% 
-          select(iati_identifier, 
-                 reporting_org_narrative,
-                 budget_status, 
-                 budget_value, 
-                 budget_value_currency,
-                 budget_period_start_iso_date,
-                 budget_period_end_iso_date) %>%
   unique()
+
+activity_list_unnest_6_test$len_val <- lengths(activity_list_unnest_6_test$budget_value)
+activity_list_unnest_6_test$len_curr <- lengths(activity_list_unnest_6_test$budget_value_currency)
+activity_list_unnest_6_test$diff <- activity_list_unnest_6_test$len_val - activity_list_unnest_6_test$len_curr
+
+activity_list_unnest_6_test_curr <- activity_list_unnest_6_test %>%
+  select(iati_identifier, budget_value_currency) %>%
+  unnest(c(budget_value_currency))
+
+activity_list_unnest_6_test_curr_unique <- activity_list_unnest_6_test_curr %>% 
+  unique() %>%
+  group_by(iati_identifier) %>%
+  summarise(budget_value_currency = paste(budget_value_currency, collapse = ", "))
+
+# separate out those with multiple currencies
+activity_list_unnest_6_test_curr_multi <- activity_list_unnest_6_test_curr[activity_list_unnest_6_test_curr$iati_identifier == "GB-COH-02622374-energy_saving_trust",]
+activity_list_unnest_6_test_curr_single <- activity_list_unnest_6_test_curr[activity_list_unnest_6_test_curr$iati_identifier != "GB-COH-02622374-energy_saving_trust",]
+
+activity_list_unnest_6_test_val <- activity_list_unnest_6_test %>%
+  select(iati_identifier, reporting_org_narrative, budget_status,budget_value,budget_period_start_iso_date,budget_period_end_iso_date) %>%
+  unnest(c(budget_status,budget_value,budget_period_start_iso_date,budget_period_end_iso_date)) %>%
+  unique()
+
+activity_list_unnest_6_test_val_multi <- activity_list_unnest_6_test_val[activity_list_unnest_6_test_val$iati_identifier == "GB-COH-02622374-energy_saving_trust",]
+activity_list_unnest_6_test_val_single <- activity_list_unnest_6_test_val[activity_list_unnest_6_test_val$iati_identifier != "GB-COH-02622374-energy_saving_trust",]
+
+
+activity_list_unnest_6_single <- activity_list_unnest_6_test_val_single %>% 
+    left_join(activity_list_unnest_6_test_curr_single, by = "iati_identifier") %>%
+  unique()
+
+activity_list_unnest_6_test_val_multi$budget_value_currency <- activity_list_unnest_6_test_curr_multi$budget_value_currency
+
+activity_list_unnest_6 <- rbind(activity_list_unnest_6_single, activity_list_unnest_6_test_val_multi)
 
 activity_list_unnest_6$budget_value_currency <- ifelse(is.na(activity_list_unnest_6$budget_value_currency),"",activity_list_unnest_6$budget_value_currency)
 
 # there are some blanks in the currency fields, i am using the below to see what currencies organisations are reporting under then will apply this to the nulls (will have to be a manual job)
 
-budget_curr <- activity_list_unnest_6 %>% select(reporting_org_narrative, budget_value_currency) %>% unnest(budget_value_currency) %>% unique()
+# budget_curr <- activity_list_unnest_6 %>% select(reporting_org_narrative, budget_value_currency) %>% unnest(budget_value_currency) %>% unique()
 
 
 # fixing the currencies manually, will need to be checking this in future iterations in case it changes
@@ -647,14 +805,32 @@ specific_trans_extract_country <- function(id) {
   rbindlist(page_list, fill=T)
 }
 
-# specific_org_extract("GB-GOV-15")
+uk_activity_ids = unique(partner_activity_comb$iati_identifier)
+uk_activity_ids <- URLencode(uk_activity_ids)
 
-transaction_list_countries <- lapply(unique(partner_activity_comb$iati_identifier), specific_trans_extract_country)
-transaction_list_countries = rbindlist(transaction_list_countries, fill=T)
+# My batches code isn't working at the moment, so having to run them individually
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
+
+# transaction_list_countries <- lapply(batches, specific_trans_extract_country)
+transaction_list_countries <- lapply(uk_activity_ids, specific_trans_extract_country)
+transaction_list_countries = rbindlist(transaction_list_countries, fill=TRUE)
+
 
 # Save to Rdata file
-# saveRDS(transaction_list_countries, file = "Outputs/transaction_list_countries_kp.rds")
-transaction_list_countries <- readRDS(file = "Outputs/transaction_list_countries_kp.rds")
+# saveRDS(transaction_list_countries, file = "Outputs/transaction_list_countries_Jan24update.rds")
+transaction_list_countries <- readRDS(file = "Outputs/transaction_list_countries_Jan24update.rds")
 
 transaction_list_countries$recipient_country <- countrycode_list$name[match(transaction_list_countries$transaction_recipient_country_code,countrycode_list$code)]
 
@@ -690,14 +866,32 @@ specific_trans_extract_recipient <- function(id) {
           rbindlist(page_list, fill=T)
         }
         
-        # specific_org_extract("GB-GOV-15")
-        
-transaction_list_recipient <- lapply(unique(partner_activity_comb$iati_identifier), specific_trans_extract_recipient)
-transaction_list_recipient = rbindlist(transaction_list_recipient, fill=T)
-        
+uk_activity_ids = unique(partner_activity_comb$iati_identifier)
+uk_activity_ids <- URLencode(uk_activity_ids)
+
+# My batches code isn't working at the moment, so having to run them individually
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
+
+# transaction_list_recipient <- lapply(batches, specific_trans_extract_recipient)
+transaction_list_recipient <- lapply(uk_activity_ids, specific_trans_extract_recipient)
+transaction_list_recipient = rbindlist(transaction_list_recipient, fill=TRUE)
+
+
 # Save to Rdata file
-# saveRDS(transaction_list_recipient, file = "Outputs/transaction_list_recipient_kp.rds")
-transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient_kp.rds")
+# saveRDS(transaction_list_recipient, file = "Outputs/transaction_list_recipient_Jan24update.rds")
+transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient_Jan24update.rds")
 
         
     # Extract receiver organisations
@@ -721,14 +915,68 @@ transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient
                      organisation_name = transaction_receiver_org_narrative) %>% 
               # Look up country from both country code and organisation name
               mutate(organisation_country = map(organisation_name, org_country_lookup)) %>% 
-              mutate(organisation_country = unlist(organisation_country)) %>% 
+              mutate(organisation_country = unlist(organisation_country)) %>%
               mutate(organisation_role = 2) # partners
               
               # Add on to org file to save
               org_names_and_locations_1 <- org_names_and_locations_1 %>% 
               rbind(receiver_orgs_to_save)      
-            
+       
+              unique(transaction_receiver_orgs$transaction_receiver_org_narrative)        
         
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "**********", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "*****", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)             
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Direct expenditure, multiple suppliers", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Partner country based NGO", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "International NGO", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Govermental", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Multilateral", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Aug'18 Payment", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Multiple Project Consultants", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)              
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Total other Project expenses", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)   
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Multiple partners paid through expenditure", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)   
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "none", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)   
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Options", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)   
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Various Suppliers", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative)   
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "General partner transfer", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative) 
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Divers fournisseurs", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative) 
+transaction_receiver_orgs$transaction_receiver_org_narrative <- 
+  ifelse(transaction_receiver_orgs$transaction_receiver_org_narrative == "Not disclosed.", "", 
+         transaction_receiver_orgs$transaction_receiver_org_narrative) 
+
+              
         # Summarise orgs for joining to main dataset
         transaction_orgs_summarised <- transaction_receiver_orgs %>% 
           group_by(iati_identifier) %>% 
@@ -759,14 +1007,17 @@ transaction_list_recipient <- readRDS(file = "Outputs/transaction_list_recipient
           left_join(transaction_org_countries_summarised, by = "iati_identifier") %>% 
           mutate(partner = coalesce(partner, transaction_receiver_org_narrative),
                  partner_country = coalesce(partner_country, transaction_receiver_country)) %>% 
-          select(-transaction_receiver_org_narrative, -transaction_receiver_country)
-
-activity_list_unnest_8 <- partner_activity_comb %>%
-          select(iati_identifier, participating_org_ref, participating_org_narrative, participating_org_activity_id) %>%
-          unnest(cols = c(participating_org_ref, participating_org_narrative, participating_org_activity_id)) %>%
-          filter(str_detect(participating_org_activity_id, "GB-1-|GB-GOV-1")) %>%
-          select(iati_identifier, participating_org_activity_id) %>%
+          select(-transaction_receiver_org_narrative, -transaction_receiver_country) %>%
           unique()
+
+        # haven't figured out what activity_list_unnest_8 does, due to lack of my comments
+        
+# activity_list_unnest_8 <- partner_activity_comb %>%
+#           select(iati_identifier, participating_org_ref, participating_org_narrative, participating_org_activity_id) %>%
+#           unnest(cols = c(participating_org_ref, participating_org_narrative, participating_org_activity_id)) %>%
+#           filter(str_detect(participating_org_activity_id, "GB-1-|GB-GOV-1")) %>%
+#           select(iati_identifier, participating_org_activity_id) %>%
+#           unique()
 
 # Join unnested info to original data
 activity_list <- activity_list_base %>% 
@@ -815,12 +1066,12 @@ activity_list <- activity_list %>%
              TRUE ~ gov_funder)) %>% unique()
 
 # Save to Rdata file
-saveRDS(activity_list, file = "Outputs/partner_activity_list_kp.rds")
-activity_list <- readRDS(file = "Outputs/partner_activity_list_kp.rds")
+# saveRDS(activity_list, file = "Outputs/partner_activity_list_Jan24update_v2.rds")
+activity_list <- readRDS(file = "Outputs/partner_activity_list_Jan24update_v2.rds")
 # write.xlsx(activity_list, file = "Outputs/partner_activity_list_kp.xlsx")
 
 # Save org names and countries to file
-saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1_kp.rds")
+saveRDS(org_names_and_locations_1, file = "Outputs/org_names_and_locations_1_Jan24update.rds")
 
 # Clear environment
 rm(partner_activity_extract, partnership_activities, partner_activities_via_title, partner_activities_via_funder,

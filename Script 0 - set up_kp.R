@@ -1,7 +1,7 @@
 
 ### Set end of quarter data for update ----
 
-quarter_end_date <- as.Date("2023-04-30")
+quarter_end_date <- as.Date("2024-05-31")
 
 
 ### Check and install packages ----
@@ -50,6 +50,15 @@ if (!("countrycode" %in% packages$Package)) {
 if (!("testthat" %in% packages$Package)) {
   install.packages("testthat")
 } 
+if (!("lubridate" %in% packages$Package)) {
+  install.packages("lubridate")
+} 
+if (!("purrr" %in% packages$Package)) {
+  install.packages("purrr")
+} 
+if (!("fuzzyjoin" %in% packages$Package)) {
+  install.packages("fuzzyjoin")
+}
 
 library(jsonlite)
 library(httr)
@@ -65,10 +74,13 @@ library(odbc)
 library(countrycode)
 library(testthat)
 library(data.table)
+library(lubridate)
+library(purrr)
+library(fuzzyjoin)
 
 ### Adding in the API Key ----
 
-API_KEY = "cb77cc509def49f9b37a00aefe5ee99f"
+API_KEY = "b2ebb1258b6e43858457db5a48a0a162"
 authentication = add_headers(`Ocp-Apim-Subscription-Key` = API_KEY)
 
 
@@ -97,7 +109,8 @@ countries_string <- paste0(str_to_lower(countries), collapse = "|")
 dac_lookup <- readxl::read_xlsx("Inputs/Country lookup - Tableau and DAC Income Group.xlsx") %>% 
   mutate(country_name = str_to_lower(country_name))
 
-
+# 3) organisation lookup
+modari_org_lookup <- readxl::read_xlsx("Inputs/MODARI org lookup work Dec 2023.xlsx")
 
 ### Input data ----
 
@@ -105,39 +118,88 @@ dac_lookup <- readxl::read_xlsx("Inputs/Country lookup - Tableau and DAC Income 
 # see the R script "checking_linking_RED_data.R" for how I collated this spreadsheet
 unlinked_partner_iati_activity_ids <- readxl::read_xlsx("Inputs/IATI partner activities_kp.xlsx", sheet=1)
 
+# FCDO-MRC Concordat grants
+concordat_grants <- readxl::read_excel("Inputs/FCDO-MRC-Concordat_data_2008-2023.xlsx")
+
+# FCDO partnerships
+fcdo_partnerships <- readxl::read_xlsx("Inputs/FCDO_partnerships.xlsx")
+
 # UKRI non GCRF/Newton project IDs
 # ukri_ooda_projects_ids <- readxl::read_xlsx("Inputs/UKRI non GCRF-Newton projects.xlsx", sheet=1) %>% 
 #  mutate(recipient_country = NA_character_)
 
 # Wellcome ODA grant data
-wellcome_grants <- readxl::read_excel("Inputs/Wellcome grants_2023.xlsx")
+wellcome_grants <- readxl::read_excel("Inputs/2023-07-26 Wellcome ODA.xlsx")
 
 # BEIS RODA GCRF/Newton extracts
-roda_extract_gcrf <- readxl::read_excel("Inputs/BEIS_GCRF_MODARI_Q4_2022-2023.xlsx", sheet = 1)
-roda_extract_newton <- readxl::read_excel("Inputs/BEIS_NF_MODARI_Q4_2022-2023.xlsx", sheet = 1)
+roda_extract_gcrf <- readxl::read_excel("Inputs/DSIT_GCRF_MODARI_Q2_2023-2024.xlsx", sheet = 2)
+gcrf_names <- c("RODA ID", "Delivery partner", "Level", "Title", "Description", "Activity Status", "Benefiting region", "Benefiting countries", "Planned start date", "Actual start date", "Planned end date", "Actual end date", "Lead Organisation", "Amount")
+colnames(roda_extract_gcrf) <- gcrf_names
+roda_extract_gcrf <- roda_extract_gcrf[-c(1),]
+
+roda_extract_gcrf <- roda_extract_gcrf %>% 
+  mutate(`Planned start date` = case_when(is.na(as.numeric(`Planned start date`)) ~ as.Date(`Planned start date`), 
+                          TRUE ~ as.Date(as.numeric(`Planned start date`), origin = "1899-12-30"))) %>%
+  mutate(`Actual start date` = case_when(is.na(as.numeric(`Actual start date`)) ~ as.Date(`Actual start date`), 
+                                          TRUE ~ as.Date(as.numeric(`Actual start date`), origin = "1899-12-30"))) %>%
+  mutate(`Planned end date` = case_when(is.na(as.numeric(`Planned end date`)) ~ as.Date(`Planned end date`), 
+                                         TRUE ~ as.Date(as.numeric(`Planned end date`), origin = "1899-12-30"))) %>%
+  mutate(`Actual end date` = case_when(is.na(as.numeric(`Actual end date`)) ~ as.Date(`Actual end date`), 
+                                         TRUE ~ as.Date(as.numeric(`Actual end date`), origin = "1899-12-30")))
+
+roda_extract_newton <- readxl::read_excel("Inputs/DSIT_NF_MODARI_Q2_2023-2024.xlsx", sheet = 1)
+colnames(roda_extract_newton) = roda_extract_newton[1,]
+roda_extract_newton <- roda_extract_newton[-c(1),]
+roda_extract_newton <- roda_extract_newton %>%
+  rename(`Planned start date` = Duration)
+
+roda_extract_newton <- roda_extract_newton %>%
+  mutate(`Planned start date` = as.Date(as.numeric(`Planned start date`), origin = "1899-12-30"))
+
+names(roda_extract_gcrf)
+names(roda_extract_newton)
 
 # DEFRA ODA grant data
 defra_grants <- readxl::read_excel("Inputs/DEFRA_MODARI_data_request.xlsx")
 
 # DHSC Global Health Security projects
-# dhsc_ghs_projects <- readxl::read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)
+dhsc_ghs_projects <- readxl::read_excel("Inputs/MODARI award data - GHS (GAMRIF and UKVN).xlsx", sheet = 1)
+# dhsc_gamrif_projects <- dhsc_ghs_projects[dhsc_ghs_projects$Fund == "DHSC - Global Health Security - GAMRIF",]
+
+dhsc_ukvn_projects <- readxl::read_excel("Inputs/GHS Data for Modari (ODA Research) - v2 SC changes.xlsx", sheet = 1)
+
 
 # DHSC/FCDO core contribution programmes/components 
 # (these are out of scope of IATI)
 gov_non_iati_programmes <- readxl::read_excel("Inputs/FCDO core contribution programmes (with beneficiary countries)_kp.xlsx")
 
 # DHSC co-funded projects
-DHSC_cofund <- readxl::read_excel("Inputs/UKRI-DHSC co-funded awards.xlsx")
+# DHSC_cofund <- readxl::read_excel("Inputs/UKRI-DHSC co-funded awards.xlsx")
+DHSC_cofund_full <- readxl::read_excel("Inputs/231110_DHSC_MRC_Co-funded_awards.xlsx")
+colnames(DHSC_cofund_full) = DHSC_cofund_full[3,]
+DHSC_cofund_full <- DHSC_cofund_full[-c(1:3),]
+
+# DHSC Partnerships
+DHSC_partnerships <- readxl::read_excel("Inputs/231205_data_template_modari.xlsx", sheet = 1)
+
+# DHSC Cross-cutting
+DHSC_crosscutting <- readxl::read_excel("Inputs/231205_data_template_modari.xlsx", sheet = 2)
 
 # FCDO RED programmes Location data. Will need to compare countries here to countries found through IATI
 
-RED_AMP_location <- readxl::read_excel("Inputs/byProject_RED_endMay23_Programmes with geography data.xlsx")
+# RED_AMP_location <- readxl::read_excel("Inputs/byProject_RED_endMay23_Programmes with geography data.xlsx")
+RED_AMP_location <- readxl::read_excel("Inputs/byProject_RED_endNov23_Programmes with geography data.xlsx")
 RED_AMP_location <- RED_AMP_location %>% 
-  group_by(ProjectId) %>% 
-  rename(Country_Name = Name) %>%
+  filter(Stage == "Delivery") %>%
+  rename(Project_ID = `Project ID`, Country_Name = `Benefitting country/region`) %>%
+  select(Project_ID, Country_Name) %>%
+  group_by(Project_ID) %>% 
   summarise(Country_Name = paste(coalesce(Country_Name, ""), collapse = ", "))
 
 
+# Import latest RED programmes at delivery list
+RED_programmes_may24 <- readxl::read_excel("Inputs/May24_RED_progs_at_delivery.xlsx")
+RED_programmes_may24 <- janitor::clean_names(RED_programmes_may24)
 
 ### Functions -----
 
@@ -352,6 +414,33 @@ org_activity_extract_IDRC <- function(page, IDRC) {
 }
 
 # Function to extract COUNTRIES from transactions for a specified IATI activity ID
+# the latest transactions_extract_country function is below, modified as my batches code don't work anymore
+
+# transactions_extract_country <- function(page, activity_id) {
+#   rows <- 1000
+#   start <- (page - 1) * rows
+#   path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+#                  'q=iati_identifier:',
+#                  activity_id,
+#                  '&wt=json',
+#                  '&rows=', rows,
+#                  '&start=', start,
+#                  '&fl=iati_identifier,value*,transaction_date*,transaction_recipient_country_code,description*,currency*')
+#   request <- GET(url = path, authentication)
+#   message(request$status_code)
+#   response <- content(request, as = "text", encoding = "UTF-8")
+#   response <- fromJSON(response, flatten = TRUE)
+#   new_data <- response$response$docs
+#   numb_data <- response$response$numFound
+#   # Condition to check when to stop
+#   
+#   if(start >= numb_data) {
+#     return(NULL)
+#   }
+#   return(new_data)
+#   
+# }
+
 transactions_extract_country <- function(page, activity_id) {
   rows <- 1000
   start <- (page - 1) * rows
@@ -377,9 +466,35 @@ transactions_extract_country <- function(page, activity_id) {
   
 }
 
-
-
 # Function to extract RECIPIENTS from transactions for a specified IATI activity ID
+# the latest transactions_extract_recipient function is below, modified as my batches code don't work anymore
+
+# transactions_extract_recipient <- function(page, activity_id) {
+#   rows <- 1000
+#   start <- (page - 1) * rows
+#   path <- paste0('https://api.iatistandard.org/datastore/transaction/select?',
+#                  'q=iati_identifier:',
+#                  activity_id,
+#                  '&wt=json',
+#                  '&rows=', rows,
+#                  '&start=', start,
+#                  '&fl=iati_identifier,value*,transaction_date*,transaction_receiver_org_narrative,transaction_receiver_org_ref,description*,currency*')
+#   request <- GET(url = path, authentication)
+#   message(request$status_code)
+#   response <- content(request, as = "text", encoding = "UTF-8")
+#   response <- fromJSON(response, flatten = TRUE)
+#   new_data <- response$response$docs
+#   numb_data <- response$response$numFound
+#   # Condition to check when to stop
+#   
+#   if(start >= numb_data) {
+#     return(NULL)
+#   }
+#   return(new_data)
+#   
+# }
+
+
 transactions_extract_recipient <- function(page, activity_id) {
   rows <- 1000
   start <- (page - 1) * rows
@@ -397,13 +512,14 @@ transactions_extract_recipient <- function(page, activity_id) {
   new_data <- response$response$docs
   numb_data <- response$response$numFound
   # Condition to check when to stop
-  
+
   if(start >= numb_data) {
     return(NULL)
   }
   return(new_data)
-  
+
 }
+
 
 # Function to extract activity names from an IATI activity ID
 
@@ -632,5 +748,6 @@ extract_ukri_projects_by_id <- function(id) {
   
   return(list(project_data, org_table))
 }
+
 
 
