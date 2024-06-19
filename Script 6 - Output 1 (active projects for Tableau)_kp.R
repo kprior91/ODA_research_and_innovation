@@ -4,22 +4,22 @@
 # --------------------------------------------------------------- #
 
 # Read in project and country datasets from previous script
-all_projects_tidied <- readRDS("Outputs/all_projects_tidied_kp_2607.rds")
-country_table_final <- readRDS("Outputs/country_table_final_kp.rds")
+all_projects_tidied <- readRDS("Outputs/all_projects_tidied_Jan24update_2901.rds")
+country_table_final <- readRDS("Outputs/country_table_final_Jan24update.rds")
 
-
+#View(tableau_projects_tidied[tableau_projects_tidied$Fund=="DSIT - Newton Fund",])
 # 1) Join countries to project data ----
 
 tableau_projects <- all_projects_tidied %>% 
   left_join(country_table_final, by = c("id" = "project_id"))
 
-tableau_projects$start_date <- substr(tableau_projects$start_date, 1, 10)
-tableau_projects$end_date <- substr(tableau_projects$end_date, 1, 10)
-tableau_projects$period_start <- substr(tableau_projects$period_start, 1, 10)
-tableau_projects$period_end <- substr(tableau_projects$period_end, 1, 10)
+# tableau_projects$start_date <- substr(tableau_projects$start_date, 1, 10)
+# tableau_projects$end_date <- substr(tableau_projects$end_date, 1, 10)
+# tableau_projects$period_start <- substr(tableau_projects$period_start, 1, 10)
+# tableau_projects$period_end <- substr(tableau_projects$period_end, 1, 10)
 
 # renaming lead_org_name ####
-unique(tableau_projects$lead_org_name)
+#unique(tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "IMPERIAL COLLEGE LONDON", "Imperial College London", tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "ROYAL HOLLOWAY, UNIVERSITY OF LONDON", "Royal Holloway, University of London", tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "SHEFFIELD HALLAM UNIVERSITY", "Sheffield Hallam University", tableau_projects$lead_org_name)
@@ -180,10 +180,37 @@ tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "UNIV
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "KEELE UNIVERSITY", "Keele University", tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "ROYAL SOCIETY", "Royal Society", tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "ACADEMY OF MEDICAL SCIENCES", "Academy of Medical Sciences", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "BRITISH COUNCIL", "British Council", tableau_projects$lead_org_name)
 tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "ROYAL ACADEMY OF ENGINEERING", "Royal Academy of Engineering", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "0", NA, tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "Vaxcyte (was SutroVax, renamed May 2020)", "Vaxcyte", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "Martin Maiden, University of Oxford", "University of Oxford", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "John Edmunds, LSHTM", "London School of Hygiene & Tropical Medicine", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "London Sch of Hygiene and Trop Medicine", "London School of Hygiene & Tropical Medicine", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "London School of Hygiene and Tropical Medicine", "London School of Hygiene & Tropical Medicine", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "University of Oxford - Jenner Institute", "University of Oxford, Jenner Institute", tableau_projects$lead_org_name)
+tableau_projects$lead_org_name <- ifelse(tableau_projects$lead_org_name == "University of Oxford (Jenner Institute)", "University of Oxford, Jenner Institute", tableau_projects$lead_org_name)
 
 
-
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "ROYAL ACADEMY OF ENGINEERING", "Royal Academy of Engineering", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "BRITISH ACADEMY", "British Academy", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "ACADEMY OF MEDICAL SCIENCES", "Academy of Medical Sciences", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "ROYAL SOCIETY", "Royal Society", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "UK SPACE AGENCY", "UK Space Agency", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "MRC", "Medical Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Medical Research Council (MRC)", "Medical Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "EPSRC", "Engineering & Physical Sciences Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "ESPRC", "Engineering & Physical Sciences Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "BBSRC", "Biotechnology & Biological Sciences Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Biotechnology and Biological Sciences Research Council (BBSRC)", "Biotechnology & Biological Sciences Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Economic and Social Research Council (ESRC)", "Economic & Social Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "DEFRA", "Department for Environment, Food, and Rural Affairs", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "DHSC", "Department of Health and Social Care", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Hivos}", "Hivos", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "IMC WORLDWIDE LTD", "IMC Worldwide Ltd", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Natural Environment Research Council (NERC)", "Natural Environment Research Council", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "Uk Research And Innovation", "UK Research and Innovation", tableau_projects$extending_org)
+tableau_projects$extending_org <- ifelse(tableau_projects$extending_org == "NIHR", "National Institute for Health and Care Research", tableau_projects$extending_org)
 
 
 # 2) Remove unnecessary country "unknown" records --------
@@ -233,22 +260,23 @@ prog_name_extract <- function(o_code) {
 }
 
 uk_activity_ids = unique(gov_funder_iati_ids$programme_iati_id)
+uk_activity_ids <- URLencode(uk_activity_ids)
 
-batch_size = 15
-batches = c()
-current_batch = c()
-for(i in 1:length(uk_activity_ids)){
-  current_id = uk_activity_ids[i]
-  if(i %% batch_size == 0){
-    current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
-    batches = c(batches, current_batch_str)
-    current_batch = c(current_id)
-  } else {
-    current_batch = c(current_batch, current_id)
-  }
-}
+# batch_size = 15
+# batches = c()
+# current_batch = c()
+# for(i in 1:length(uk_activity_ids)){
+#   current_id = uk_activity_ids[i]
+#   if(i %% batch_size == 0){
+#     current_batch_str = paste0('("', paste(current_batch, collapse = '" OR "'), '")')
+#     batches = c(batches, current_batch_str)
+#     current_batch = c(current_id)
+#   } else {
+#     current_batch = c(current_batch, current_id)
+#   }
+# }
 
-programme_extract <- lapply(batches, prog_name_extract)
+programme_extract <- lapply(uk_activity_ids, prog_name_extract)
 programme_extract = rbindlist(programme_extract, fill=TRUE)
 
 programme_extract <- programme_extract %>% 
@@ -256,8 +284,8 @@ programme_extract <- programme_extract %>%
   rename(programme_iati_id = iati_identifier)
 
 # Save to Rdata file
-# saveRDS(programme_extract, file = "Outputs/last_programme_extract_kp.rds")
-programme_extract <- readRDS(file = "Outputs/last_programme_extract_kp.rds")
+# saveRDS(programme_extract, file = "Outputs/last_programme_extract_Jan24update.rds")
+programme_extract <- readRDS(file = "Outputs/last_programme_extract_Jan24update.rds")
 
 gov_funder_iati_ids <- gov_funder_iati_ids %>%
   left_join(programme_extract, by = "programme_iati_id") %>%
@@ -279,47 +307,92 @@ tableau_projects_tidied <- tableau_projects %>%
       left_join(gov_funder_iati_ids, by = "iati_id") %>% 
       mutate(funder_programme = if_else(extending_org == "Wellcome Trust", subject, funder_programme))
 
-
+# View(tableau_projects_tidied[tableau_projects_tidied$Fund=="DHSC - Global Health Security - UK Vaccine Network",])
 # 4) Apply manual exclusions/rules ----------------------------
 
 # TEMPORARY ***
 # Remove IDRC DHSC IATI data (this has been provided instead by spreadsheet)
-tableau_projects_tidied <- tableau_projects_tidied %>%
-  filter(!(Funder == "Department of Health and Social Care" &
-           extending_org == "International Development Research Centre")
-         )
+# tableau_projects_tidied <- tableau_projects_tidied %>%
+#   filter(!(Funder == "Department of Health and Social Care" &
+#            extending_org == "International Development Research Centre")
+#          )
 
-
-# 5) Write data --------------------------------
+# View(tableau_projects_tidied[tableau_projects_tidied$Fund=="DSIT - Newton Fund",])
 
 tableau_projects_tidied$status <- ifelse(tableau_projects_tidied$iati_id %in% c("GB-1-111043"), "Closed", tableau_projects_tidied$status)
+tableau_projects_tidied$iati_id <- ifelse(tableau_projects_tidied$iati_id %in% c("cGB-COH-RC000658-GB-GOV-1-301132"), "GB-COH-RC000658-GB-GOV-1-301132", tableau_projects_tidied$iati_id)
+
+tableau_projects_tidied <- tableau_projects_tidied %>% relocate(iati_id, .before = id)
+tableau_projects_tidied$iati_id <- ifelse(tableau_projects_tidied$iati_id == tableau_projects_tidied$id, NA, tableau_projects_tidied$iati_id)
+
+tableau_projects_tidied$delivery_partner_id <- NA
+tableau_projects_tidied <- tableau_projects_tidied %>% relocate(delivery_partner_id, .before = id)
+tableau_projects_tidied$iati_id <- str_trim(tableau_projects_tidied$iati_id, "left")
+
+tableau_projects_tidied$delivery_partner_id <- ifelse(!str_starts(tableau_projects_tidied$iati_id, "GB-GOV-|GB-1-"), tableau_projects_tidied$iati_id, NA)
+tableau_projects_tidied$iati_id <- ifelse(!str_starts(tableau_projects_tidied$iati_id, "GB-GOV-|GB-1-"), NA, tableau_projects_tidied$iati_id)
+
+tableau_projects_tidied$funder_proj_id <- NA
+tableau_projects_tidied <- tableau_projects_tidied %>% relocate(funder_proj_id, .before = delivery_partner_id)
+
+tableau_projects_tidied$funder_proj_id <- ifelse(grepl(".*-\\d{3}$", tableau_projects_tidied$iati_id), tableau_projects_tidied$iati_id, NA)
+tableau_projects_tidied$iati_id <- ifelse(grepl(".*-\\d{3}$", tableau_projects_tidied$iati_id), sub("-\\d{3}$", "", tableau_projects_tidied$iati_id), tableau_projects_tidied$iati_id)
+
+tableau_projects_tidied <- tableau_projects_tidied %>% rename(funder_prog_id = iati_id)
+
+tableau_projects_tidied$funder_proj_id <- ifelse(str_starts(tableau_projects_tidied$id, "GB-GOV-1-|GB-1-") & grepl(".*-\\d{3}$", tableau_projects_tidied$id), tableau_projects_tidied$id, tableau_projects_tidied$funder_proj_id)
+
+tableau_projects_tidied$funder_prog_id <- ifelse(tableau_projects_tidied$delivery_partner_id %in% c("GB-COH-RC000658-GB-GOV-1-301132"), "GB-GOV-1-301132", tableau_projects_tidied$funder_prog_id)
+tableau_projects_tidied$funder_prog_id <- ifelse(tableau_projects_tidied$delivery_partner_id %in% c("GB-COH-RC000797-GB-GOV-1-300180"), "GB-GOV-1-300180", tableau_projects_tidied$funder_prog_id)
+tableau_projects_tidied$funder_prog_id <- ifelse(tableau_projects_tidied$delivery_partner_id %in% c("GB-COH-05543952-GB-1-205222"), "GB-1-205222", tableau_projects_tidied$funder_prog_id)
+
+
+dates_wrong <- 
+tableau_projects_tidied %>% 
+  filter(status=="Closed" & end_date > quarter_end_date) %>%
+  select(id) %>%
+  unique()
+
+tableau_projects_tidied$status <- ifelse(tableau_projects_tidied$id %in% c(dates_wrong$id), "Active", tableau_projects_tidied$status)
+
+
+tableau_projects_tidied[tableau_projects_tidied$id=="AH/S004025/1",]
 
 # Restrict to active projects for Tableau
 tableau_projects_tidied <- tableau_projects_tidied %>% 
-  filter(status %in% c("Active", "Unknown")) %>% 
+  filter(status %in% c("Active", "Unknown") | end_date > "2018-12-31") %>% 
   unique()
 
-tableau_projects_tidied <- tableau_projects_tidied %>% 
-  mutate(Fund = case_when(
-    Fund == "Global Challenges Research Fund (GCRF)" ~ "DSIT - Global Challenges Research Fund (GCRF)",
-    Fund == "Newton Fund" ~ "DSIT - Newton Fund",
-    Fund == "Chevening Scholarships" ~ "FCDO - Chevening Scholarships",
-    Fund == "Global Health Research - Partnerships" ~ "DHSC - Global Health Research - Partnerships",
-    Fund == "Global Health Research - Programmes" ~ "DHSC - Global Health Research - Programmes",
-    Fund == "Global Health Security - GAMRIF" ~ "DHSC - Global Health Security - GAMRIF",
-    Fund == "Global Health Security - UK Vaccine Network" ~ "DHSC - Global Health Security - UK Vaccine Network",
-    Fund == "International Climate Finance (ICF)" ~ "DSIT - International Climate Finance (ICF)",        
-    TRUE ~ Fund
-  ))
+gcrf_test <- tableau_projects_tidied[tableau_projects_tidied$Fund=="DSIT - Global Challenges Research Fund (GCRF)",]
+unique(gcrf_test[gcrf_test$end_date > "2023-12-31",]$id)
+newton_test <- tableau_projects_tidied[tableau_projects_tidied$Fund=="DSIT - Newton Fund",]
+newton_test[newton_test$status=="Active",]
+
+# 5) Write data --------------------------------
+
+
+# tableau_projects_tidied <- tableau_projects_tidied %>% 
+#   mutate(Fund = case_when(
+#     Fund == "Global Challenges Research Fund (GCRF)" ~ "DSIT - Global Challenges Research Fund (GCRF)",
+#     Fund == "Newton Fund" ~ "DSIT - Newton Fund",
+#     Fund == "Chevening Scholarships" ~ "FCDO - Chevening Scholarships",
+#     Fund == "Global Health Research - Partnerships" ~ "DHSC - Global Health Research - Partnerships",
+#     Fund == "Global Health Research - Programmes" ~ "DHSC - Global Health Research - Programmes",
+#     Fund == "Global Health Security - GAMRIF" ~ "DHSC - Global Health Security - GAMRIF",
+#     Fund == "Global Health Security - UK Vaccine Network" ~ "DHSC - Global Health Security - UK Vaccine Network",
+#     Fund == "International Climate Finance (ICF)" ~ "DSIT - International Climate Finance (ICF)",        
+#     TRUE ~ Fund
+#   ))
 
 # remove unallocated budget
 
 tableau_projects_tidied <- tableau_projects_tidied %>% filter(title != "Unallocated budget")
 
+
 # Write to RDS 
-saveRDS(tableau_projects_tidied, "Outputs/tableau_projects_tidied_kp_2607.rds")
-# tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied_kp_2607.rds")
-write.xlsx(tableau_projects_tidied, file = "Outputs/tableau_projects_tidied_kp_2607.xlsx")
+saveRDS(tableau_projects_tidied, "Outputs/tableau_projects_tidied_Jan24update_2901.rds")
+# tableau_projects_tidied <- readRDS("Outputs/tableau_projects_tidied_Jan24update.rds")
+write.xlsx(tableau_projects_tidied, file = "Outputs/tableau_projects_tidied_Jan24update_2901.xlsx")
 
 
 # comparing sector codes in AMP with what came from IATI
@@ -340,7 +413,7 @@ tableau_projects_tidied_tosave <- tableau_projects_tidied %>%
   left_join(tableau_projects_tidied_dwnld, by = "id")
 
 
-write.xlsx(tableau_projects_tidied_tosave, file = "Outputs/tableau_projects_tidied_kp_2607_dwnld.xlsx")
+write.xlsx(tableau_projects_tidied_tosave, file = "Outputs/tableau_projects_tidied_Jan24update_dwnld_2901.xlsx")
 
 
 # Write data to EC google drive 
@@ -354,3 +427,12 @@ write.xlsx(tableau_projects_tidied_tosave, file = "Outputs/tableau_projects_tidi
 #                              ss = results,
 #                              sheet = "ODA_RI_projects")
 
+
+fcdo_summary <- tableau_projects_tidied %>% 
+  filter(Funder == "Foreign, Commonwealth and Development Office") %>%
+  filter(!is.na(funder_programme)) %>%
+  group_by(funder_prog_id, funder_programme, status) %>%
+  summarise(length_ext_org = length(unique(extending_org)))
+
+fcdo_summary_active <- fcdo_summary %>% filter(status == "Active")
+fcdo_summary_active[fcdo_summary_active$length_ext_org >1,]
